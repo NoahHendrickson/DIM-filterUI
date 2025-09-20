@@ -1,10 +1,13 @@
+import { PressTip } from 'app/dim-ui/PressTip';
 import { t } from 'app/i18next-t';
 import { DimItem } from 'app/inventory/item-types';
 import { allItemsSelector, createItemContextSelector } from 'app/inventory/selectors';
 import { makeFakeItem } from 'app/inventory/store/d2-item-factory';
+import { isPluggableItem } from 'app/inventory/store/sockets';
+import { PlugDefTooltip } from 'app/item-popup/PlugTooltip';
 import LoadoutEditSection from 'app/loadout/loadout-edit/LoadoutEditSection';
 import { useD2Definitions } from 'app/manifest/selectors';
-import { DestinyClass } from 'bungie-api-ts/destiny2';
+import { DestinyClass, DestinyItemSubType } from 'bungie-api-ts/destiny2';
 import { BucketHashes } from 'data/d2/generated-enums';
 import { sample } from 'es-toolkit';
 import anyExoticIcon from 'images/anyExotic.svg';
@@ -14,7 +17,11 @@ import { Dispatch, memo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { LoadoutBuilderAction } from '../loadout-builder-reducer';
 import { LOCKED_EXOTIC_ANY_EXOTIC, LOCKED_EXOTIC_NO_EXOTIC } from '../types';
-import ExoticPicker, { findLockableExotics, resolveExoticInfo } from './ExoticPicker';
+import ExoticPicker, {
+  ExoticPerkPicker,
+  findLockableExotics,
+  resolveExoticInfo,
+} from './ExoticPicker';
 import { exoticTileInfo } from './ExoticTile';
 import * as styles from './LoadoutOptimizerExotic.m.scss';
 
@@ -23,6 +30,8 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
   className,
   storeId,
   lockedExoticHash,
+  perk1 = 0,
+  perk2 = 0,
   vendorItems,
   lbDispatch,
 }: {
@@ -30,10 +39,13 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
   storeId: string;
   className?: string;
   lockedExoticHash: number | undefined;
+  perk1: number;
+  perk2: number;
   vendorItems: DimItem[];
   lbDispatch: Dispatch<LoadoutBuilderAction>;
 }) {
   const [showExoticPicker, setShowExoticPicker] = useState(false);
+  const [showExoticPerkPicker, setShowExoticPerkPicker] = useState(false);
   const defs = useD2Definitions()!;
   const allItems = useSelector(allItemsSelector);
 
@@ -57,6 +69,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
   };
 
   const handleClickEdit = () => setShowExoticPicker(true);
+  const handleClickEditPerk = () => setShowExoticPerkPicker(true);
 
   return (
     <LoadoutEditSection
@@ -67,16 +80,60 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
       onRandomize={handleRandomize}
     >
       <ChosenExoticOption lockedExoticHash={lockedExoticHash} onClick={handleClickEdit} />
-      <button type="button" className="dim-button" onClick={handleClickEdit}>
-        {t('LB.SelectExotic')}
-      </button>
+      {isClassArmor && (perks ?? []).some((p) => p !== 0) && (
+        <div className={styles.selectedPerks} onClick={handleClickEditPerk}>
+          {(perks ?? [])
+            .filter((p) => p !== 0)
+            .map((perkHash) => {
+              const def = defs.InventoryItem.get(perkHash);
+              return (
+                def &&
+                isPluggableItem(def) && (
+                  <PressTip
+                    key={perkHash}
+                    tooltip={<PlugDefTooltip def={def} />}
+                    placement="top"
+                    className={styles.selectedPerk}
+                  >
+                    <DefItemIcon itemDef={def} />
+                    {def.displayProperties.name}
+                  </PressTip>
+                )
+              );
+            })}
+        </div>
+      )}
+      <div className={styles.buttons}>
+        <button type="button" className="dim-button" onClick={handleClickEdit}>
+          {t('LB.SelectExotic')}
+        </button>
+        {isClassArmor && (
+          <button type="button" className="dim-button" onClick={handleClickEditPerk}>
+            {t('LB.SelectPerks')}
+          </button>
+        )}
       {showExoticPicker && (
         <ExoticPicker
           lockedExoticHash={lockedExoticHash}
           vendorItems={vendorItems}
           classType={classType}
-          onSelected={(exotic) => lbDispatch({ type: 'lockExotic', lockedExoticHash: exotic })}
+          onSelected={(exotic) => {
+            lbDispatch({ type: 'lockExotic', lockedExoticHash: exotic });
+            if (
+              exotic &&
+              defs.InventoryItem.get(exotic)?.itemSubType === DestinyItemSubType.ClassArmor
+            ) {
+              setShowExoticPerkPicker(true);
+            }
+          }}
           onClose={() => setShowExoticPicker(false)}
+        />
+      )}
+      {showExoticPerkPicker && (
+        <ExoticPerkPicker
+          lockedExoticHash={lockedExoticHash}
+          onSelected={(perk1, perk2) => lbDispatch({ type: 'lockExoticPerks', perk1, perk2 })}
+          onClose={() => setShowExoticPerkPicker(false)}
         />
       )}
     </LoadoutEditSection>
@@ -87,9 +144,13 @@ export default LoadoutOptimizerExotic;
 
 function ChosenExoticOption({
   lockedExoticHash,
+  perk1,
+  perk2,
   onClick,
 }: {
   lockedExoticHash: number | undefined;
+  perk1: number | undefined;
+  perk2: number | undefined;
   onClick: () => void;
 }) {
   const defs = useD2Definitions()!;
