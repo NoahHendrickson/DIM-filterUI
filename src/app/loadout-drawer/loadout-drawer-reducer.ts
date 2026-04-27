@@ -577,11 +577,12 @@ export function setLoadoutPerks(removed: number[], added: number[]): LoadoutUpda
         perks.splice(index, 1);
       }
     }
+    const newPerks = perks.concat(added);
     return {
       ...loadout,
       parameters: {
         ...loadout.parameters,
-        ...perks.concat(added),
+        perks: newPerks.length > 0 ? newPerks : undefined,
       },
     };
   };

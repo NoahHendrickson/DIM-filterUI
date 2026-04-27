@@ -42,6 +42,11 @@ export interface ProcessInputs {
   lockedMods: LockedProcessMods;
   /** If we're requiring any set bonuses, the number of items desired from each set */
   setBonuses: SetBonusCounts;
+  /**
+   * Required armor perks and how many items in the set must have each perk.
+   * Duplicate entries in the source perks array are collapsed into counts here.
+   */
+  requiredPerks: { hash: number; count: number }[];
   /** The user's chosen stat ranges, in priority order. */
   desiredStatRanges: DesiredStatRange[];
   /** Ensure every set includes one exotic */
@@ -68,6 +73,7 @@ export async function process(
     modStatTotals,
     lockedMods,
     setBonuses,
+    requiredPerks,
     desiredStatRanges,
     anyExotic,
     autoModOptions,
@@ -134,6 +140,7 @@ export async function process(
       noExotic: 0,
       skippedLowTier: 0,
       insufficientSetBonus: 0,
+      insufficientPerks: 0,
     },
     lowerBoundsExceeded: { timesChecked: 0, timesFailed: 0 },
     modsStatistics: {
@@ -240,6 +247,20 @@ export async function process(
             if (anyExotic && exoticSum === 0) {
               setStatistics.skipReasons.noExotic += 1;
               continue;
+            }
+
+            // Check required perk counts across the set
+            for (const { hash, count } of requiredPerks) {
+              const actualCount =
+                Number(helm.intrinsicPerks?.includes(hash)) +
+                Number(gaunt.intrinsicPerks?.includes(hash)) +
+                Number(chest.intrinsicPerks?.includes(hash)) +
+                Number(leg.intrinsicPerks?.includes(hash)) +
+                Number(classItem.intrinsicPerks?.includes(hash));
+              if (actualCount < count) {
+                setStatistics.skipReasons.insufficientPerks++;
+                continue innerloop;
+              }
             }
 
             // Check set bonus requirements

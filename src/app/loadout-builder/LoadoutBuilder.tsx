@@ -136,8 +136,6 @@ export default memo(function LoadoutBuilder({
 
   const loadoutParameters = loadout.parameters!;
   const lockedExoticHash = loadoutParameters.exoticArmorHash;
-  const exoticPerk1 = loadoutParameters.perks?.[0];
-  const exoticPerk2 = loadoutParameters.perks?.[1];
   const statConstraints = loadoutParameters.statConstraints!;
   const autoStatMods = Boolean(loadoutParameters.autoStatMods);
   const includeRuntimeStatBenefits = loadoutParameters.includeRuntimeStatBenefits ?? true;
@@ -245,6 +243,7 @@ export default memo(function LoadoutBuilder({
       armorEnergyRules,
       searchFilter,
       setBonuses,
+      perks: loadoutParameters.perks,
     });
     return [armorEnergyRules, items, filterInfo];
   }, [
@@ -258,6 +257,7 @@ export default memo(function LoadoutBuilder({
     lockedExoticHash,
     searchFilter,
     setBonuses,
+    loadoutParameters.perks,
   ]);
 
   const modStatChanges = useMemo(
@@ -278,6 +278,7 @@ export default memo(function LoadoutBuilder({
     selectedStore,
     filteredItems,
     setBonuses,
+    perks: loadoutParameters.perks ?? [],
     lockedModMap,
     modStatChanges,
     armorEnergyRules,
@@ -398,6 +399,7 @@ export default memo(function LoadoutBuilder({
         lbDispatch={lbDispatch}
         storeId={selectedStore.id}
         className={styles.loadoutEditSection}
+        perks={loadoutParameters.perks}
       />
       <LoadoutOptimizerSetBonus
         storeId={selectedStore.id}

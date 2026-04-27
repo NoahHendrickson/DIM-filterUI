@@ -10,6 +10,7 @@ import { ItemFilter } from 'app/search/filter-types';
 import { sumBy } from 'app/utils/collections';
 import { getModTypeTagByPlugCategoryHash, getSpecialtySocketMetadata } from 'app/utils/item-utils';
 import { warnLog } from 'app/utils/log';
+import { getExtraIntrinsicPerkSockets } from 'app/utils/socket-utils';
 import { computeStatDupeLower } from 'app/utils/stats';
 import { BucketHashes } from 'data/d2/generated-enums';
 import { sum } from 'es-toolkit';
@@ -59,6 +60,7 @@ export function filterItems({
   armorEnergyRules,
   searchFilter,
   setBonuses,
+  perks,
 }: {
   defs: D2ManifestDefinitions | undefined;
   items: DimItem[];
@@ -70,6 +72,8 @@ export function filterItems({
   armorEnergyRules: ArmorEnergyRules;
   searchFilter: ItemFilter;
   setBonuses?: SetBonusCounts;
+  /** Perk hashes required on armor items in the set. Used to pre-filter items with matching intrinsic perks. */
+  perks?: number[];
 }): [ItemsByBucket, FilterInfo] {
   const filteredItems: Draft<ItemsByBucket> = {
     [BucketHashes.Helmet]: [],
@@ -169,8 +173,34 @@ export function filterItems({
       // If the user pinned an item, that's what they get
       firstPassFilteredItems = [pinnedItem];
     } else if (exotics) {
-      // If the user chose an exotic, only include items matching that exotic
-      firstPassFilteredItems = exotics;
+      // If the user chose an exotic, only include items matching that exotic.
+      // For exotic class items with selected perks, further filter to matching items.
+      if (perks?.length && bucket === BucketHashes.ClassArmor) {
+        // Build the set of all possible exotic class item perk hashes so we only
+        // filter by perks that actually belong to these sockets, ignoring any
+        // other perk hashes that may be in loadoutParams.perks (e.g. regular armor intrinsics).
+        const allClassPerkHashes = new Set(
+          exotics.flatMap((item) =>
+            getExtraIntrinsicPerkSockets(item)
+              .map((s) => s.plugged?.plugDef.hash)
+              .filter((h): h is number => h !== undefined),
+          ),
+        );
+        const relevantPerks = perks.filter((p) => allClassPerkHashes.has(p));
+        firstPassFilteredItems =
+          relevantPerks.length > 0
+            ? exotics.filter((item) => {
+                const equipped = new Set(
+                  getExtraIntrinsicPerkSockets(item)
+                    .map((s) => s.plugged?.plugDef.hash)
+                    .filter((h): h is number => h !== undefined),
+                );
+                return relevantPerks.every((p) => equipped.has(p));
+              })
+            : exotics;
+      } else {
+        firstPassFilteredItems = exotics;
+      }
     } else if (
       // The user chose to exclude all exotics
       lockedExoticHash === LOCKED_EXOTIC_NO_EXOTIC ||

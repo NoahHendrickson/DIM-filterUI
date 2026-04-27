@@ -10,6 +10,7 @@ import { t } from 'app/i18next-t';
 import { DimItem } from 'app/inventory/item-types';
 import { DefItemIcon } from 'app/inventory/ItemIcon';
 import { allItemsSelector } from 'app/inventory/selectors';
+import { isPluggableItem } from 'app/inventory/store/sockets';
 import { PlugDefTooltip } from 'app/item-popup/PlugTooltip';
 import { isLoadoutBuilderItem } from 'app/loadout/loadout-item-utils';
 import { useD2Definitions } from 'app/manifest/selectors';
@@ -253,17 +254,17 @@ export default function ExoticPicker({
 
 export function ExoticPerkPicker({
   lockedExoticHash,
+  initialPerks,
   onSelected,
   onClose,
 }: {
   lockedExoticHash?: number;
-  onSelected: (selectedPerk1: number, selectedPerk2: number) => void;
+  /** Perk hashes to pre-select; matched to row1/row2 by checking which row each hash belongs to. */
+  initialPerks?: number[];
+  onSelected: (removed: number[], added: number[]) => void;
   onClose: () => void;
 }) {
   const defs = useD2Definitions()!;
-  const [selectedPerk1, setSelectedPerk1] = useState<number>(0);
-  const [selectedPerk2, setSelectedPerk2] = useState<number>(0);
-
   const allItems = useSelector(allItemsSelector).filter((item) => item.hash === lockedExoticHash);
 
   const row1Perks = new Map<number, Set<number>>();
@@ -284,22 +285,17 @@ export function ExoticPerkPicker({
     }
   }
 
-  const handlePerk1Click = (perkHash: number) => () => {
-    setSelectedPerk1((perk1) => {
-      if (perk1 === perkHash) {
-        return 0;
-      }
-      return perkHash;
-    });
-  };
-  const handlePerk2Click = (perkHash: number) => () => {
-    setSelectedPerk2((perk2) => {
-      if (perk2 === perkHash) {
-        return 0;
-      }
-      return perkHash;
-    });
-  };
+  const [selectedPerk1, setSelectedPerk1] = useState<number>(
+    () => initialPerks?.find((p) => row1Perks.has(p)) ?? 0,
+  );
+  const [selectedPerk2, setSelectedPerk2] = useState<number>(
+    () => initialPerks?.find((p) => row2Perks.has(p)) ?? 0,
+  );
+
+  const handlePerk1Click = (hash: number) => () =>
+    setSelectedPerk1((prev) => (prev === hash ? 0 : hash));
+  const handlePerk2Click = (hash: number) => () =>
+    setSelectedPerk2((prev) => (prev === hash ? 0 : hash));
 
   const footer = ({ onClose }: { onClose: () => void }) => (
     <Footer
@@ -307,7 +303,9 @@ export function ExoticPerkPicker({
       selectedPerk2={selectedPerk2}
       onSubmit={(event) => {
         event.preventDefault();
-        onSelected(selectedPerk1, selectedPerk2);
+        const removed = [...row1Perks.keys(), ...row2Perks.keys()];
+        const added = [selectedPerk1, selectedPerk2].filter((p) => p !== 0);
+        onSelected(removed, added);
         onClose();
       }}
     />
@@ -317,7 +315,7 @@ export function ExoticPerkPicker({
     <Sheet
       header={
         <div>
-          <h1>{t('LB.ChooseAnExotic')}</h1>
+          <h1>{t('LB.ChooseExoticPerks')}</h1>
         </div>
       }
       footer={footer}
@@ -385,8 +383,8 @@ function Footer({
   const displayPerk = (selectedPerk: number) => {
     const def = defs.InventoryItem.get(selectedPerk);
     return (
-      def !== undefined && (
-        <PressTip tooltip={<PlugDefTooltip def={def} />}>
+      isPluggableItem(def) && (
+        <PressTip tooltip={<PlugDefTooltip def={def} />} className={styles.selectedPerk}>
           <DefItemIcon itemDef={def} />
           {def.displayProperties.name}
         </PressTip>

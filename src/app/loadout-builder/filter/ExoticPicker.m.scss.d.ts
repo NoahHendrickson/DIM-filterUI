@@ -3,6 +3,7 @@
 interface CssExports {
   'container': string;
   'footer': string;
+  'selectedPerk': string;
   'selectedPerks': string;
   'submitButton': string;
 }

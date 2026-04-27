@@ -1,6 +1,7 @@
 import { PressTip } from 'app/dim-ui/PressTip';
 import { t } from 'app/i18next-t';
 import { DimItem } from 'app/inventory/item-types';
+import { DefItemIcon } from 'app/inventory/ItemIcon';
 import { allItemsSelector, createItemContextSelector } from 'app/inventory/selectors';
 import { makeFakeItem } from 'app/inventory/store/d2-item-factory';
 import { isPluggableItem } from 'app/inventory/store/sockets';
@@ -30,8 +31,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
   className,
   storeId,
   lockedExoticHash,
-  perk1 = 0,
-  perk2 = 0,
+  perks,
   vendorItems,
   lbDispatch,
 }: {
@@ -39,8 +39,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
   storeId: string;
   className?: string;
   lockedExoticHash: number | undefined;
-  perk1: number;
-  perk2: number;
+  perks?: number[];
   vendorItems: DimItem[];
   lbDispatch: Dispatch<LoadoutBuilderAction>;
 }) {
@@ -70,6 +69,10 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
 
   const handleClickEdit = () => setShowExoticPicker(true);
   const handleClickEditPerk = () => setShowExoticPerkPicker(true);
+
+  const isClassArmor =
+    lockedExoticHash !== undefined &&
+    defs.InventoryItem.get(lockedExoticHash)?.itemSubType === DestinyItemSubType.ClassArmor;
 
   return (
     <LoadoutEditSection
@@ -112,6 +115,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
             {t('LB.SelectPerks')}
           </button>
         )}
+      </div>
       {showExoticPicker && (
         <ExoticPicker
           lockedExoticHash={lockedExoticHash}
@@ -132,10 +136,8 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
       {showExoticPerkPicker && (
         <ExoticPerkPicker
           lockedExoticHash={lockedExoticHash}
-          onSelected={(perk1, perk2) =>
-            // TODO properly handle removing perks
-            lbDispatch({ type: 'updatePerks', removed: [], added: [perk1, perk2] })
-          }
+          initialPerks={perks}
+          onSelected={(removed, added) => lbDispatch({ type: 'updatePerks', removed, added })}
           onClose={() => setShowExoticPerkPicker(false)}
         />
       )}
@@ -147,13 +149,9 @@ export default LoadoutOptimizerExotic;
 
 function ChosenExoticOption({
   lockedExoticHash,
-  perk1,
-  perk2,
   onClick,
 }: {
   lockedExoticHash: number | undefined;
-  perk1: number | undefined;
-  perk2: number | undefined;
   onClick: () => void;
 }) {
   const defs = useD2Definitions()!;
@@ -213,8 +211,7 @@ function ChosenExoticOption({
           isArmor1: Boolean(fakeItem?.energy),
         });
         if (fakeItem.bucket.hash === BucketHashes.ClassArmor) {
-          info.description = t('LoadoutBuilder.ExoticClassItemPerks');
-          info.descriptionClassName = styles.warning;
+          info.description = undefined;
         }
         break;
       }

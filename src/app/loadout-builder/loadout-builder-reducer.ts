@@ -520,12 +520,15 @@ function lbConfigReducer(defs: D2ManifestDefinitions) {
         return updateLoadout(state, removeMod(action.mod));
       case 'lockExotic': {
         const { lockedExoticHash } = action;
-        return updateLoadout(state, setLoadoutParameters({ exoticArmorHash: lockedExoticHash }));
+        return updateLoadout(
+          state,
+          setLoadoutParameters({ exoticArmorHash: lockedExoticHash, perks: undefined }),
+        );
       }
       case 'removeLockedExotic':
         return updateLoadout(
           state,
-          setLoadoutParameters({ exoticArmorHash: undefined, perks: [] }),
+          setLoadoutParameters({ exoticArmorHash: undefined, perks: undefined }),
         );
       case 'updatePerks': {
         const { removed, added } = action;

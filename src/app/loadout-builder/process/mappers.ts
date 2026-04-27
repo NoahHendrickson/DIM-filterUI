@@ -14,7 +14,11 @@ import {
 import { armorStats } from 'app/search/d2-known-values';
 import { filterMap, mapValues, sumBy } from 'app/utils/collections';
 import { compareBy } from 'app/utils/comparators';
-import { getArmor3TuningSocket } from 'app/utils/socket-utils';
+import {
+  getArmor3TuningSocket,
+  getExtraIntrinsicPerkSockets,
+  getIntrinsicArmorPerkSocket,
+} from 'app/utils/socket-utils';
 import { emptyPlugHashes } from 'data/d2/empty-plug-hashes';
 import { StatHashes } from 'data/d2/generated-enums';
 import { minBy } from 'es-toolkit';
@@ -81,6 +85,19 @@ export function mapDimItemToProcessItems({
 
   const assumeArtifice = isAssumedArtifice(dimItem, armorEnergyRules);
 
+  const intrinsicPerkHashes: number[] = [];
+  const mainIntrinsicPerk = getIntrinsicArmorPerkSocket(dimItem)?.plugged?.plugDef.hash;
+  if (mainIntrinsicPerk !== undefined) {
+    intrinsicPerkHashes.push(mainIntrinsicPerk);
+  }
+  for (const s of getExtraIntrinsicPerkSockets(dimItem)) {
+    const h = s.plugged?.plugDef.hash;
+    if (h !== undefined) {
+      intrinsicPerkHashes.push(h);
+    }
+  }
+  const intrinsicPerks = intrinsicPerkHashes.length > 0 ? intrinsicPerkHashes : undefined;
+
   const processItem: ProcessItem = {
     id,
     hash,
@@ -92,6 +109,7 @@ export function mapDimItemToProcessItems({
     remainingEnergyCapacity: capacity - modsCost,
     compatibleActivityMod: compatibleActivityMod,
     setBonus: setBonus?.hash,
+    intrinsicPerks,
   };
 
   const tuningSocket = getArmor3TuningSocket(dimItem);
