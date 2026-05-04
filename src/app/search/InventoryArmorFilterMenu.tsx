@@ -4,6 +4,7 @@ import { t } from 'app/i18next-t';
 import { useD2Definitions } from 'app/manifest/selectors';
 import {
   applyArmorKvFilter,
+  armorKvFilterIsActive,
   type ArmorKvFilterKeyword,
 } from 'app/search/armor-filter-query';
 import { realD2ArmorStatHashByName } from 'app/search/d2-known-values';
@@ -99,8 +100,10 @@ export default function InventoryArmorFilterMenu() {
 
   const applyFilter = (keyword: ArmorKvFilterKeyword, value: string) => {
     dispatch(setSearchQuery(applyArmorKvFilter(query, keyword, value), true));
-    setOpen(false);
   };
+
+  const isActive = (keyword: ArmorKvFilterKeyword, value: string) =>
+    armorKvFilterIsActive(query, keyword, value);
 
   return (
     <>
@@ -124,7 +127,7 @@ export default function InventoryArmorFilterMenu() {
                 <button
                   key={slug}
                   type="button"
-                  className={styles.chip}
+                  className={clsx(styles.chip, isActive('setbonus', slug) && styles.chipActive)}
                   role="menuitem"
                   title={`setbonus:${slug}`}
                   onClick={() => applyFilter('setbonus', slug)}
@@ -141,7 +144,7 @@ export default function InventoryArmorFilterMenu() {
                 <button
                   key={name}
                   type="button"
-                  className={styles.chip}
+                  className={clsx(styles.chip, isActive('archetype', name) && styles.chipActive)}
                   role="menuitem"
                   title={`archetype:${name}`}
                   onClick={() => applyFilter('archetype', name)}
@@ -158,7 +161,7 @@ export default function InventoryArmorFilterMenu() {
                 <button
                   key={key}
                   type="button"
-                  className={styles.chip}
+                  className={clsx(styles.chip, isActive('tuning', key) && styles.chipActive)}
                   role="menuitem"
                   title={`tuning:${key}`}
                   onClick={() => applyFilter('tuning', key)}
@@ -175,7 +178,7 @@ export default function InventoryArmorFilterMenu() {
                 <button
                   key={`tertiary-${key}`}
                   type="button"
-                  className={styles.chip}
+                  className={clsx(styles.chip, isActive('tertiarystat', key) && styles.chipActive)}
                   role="menuitem"
                   title={`tertiarystat:${key}`}
                   onClick={() => applyFilter('tertiarystat', key)}

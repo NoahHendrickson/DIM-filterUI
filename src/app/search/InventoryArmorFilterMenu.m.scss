@@ -53,11 +53,17 @@
   color: var(--theme-text);
   text-align: left;
   max-width: 100%;
+  outline: 1px solid transparent;
+  outline-offset: 1px;
 
   @include interactive($hover: true) {
     background: var(--theme-accent-primary);
     color: var(--theme-text-invert);
   }
+}
+
+.chipActive {
+  outline-color: var(--theme-accent-primary);
 }
 
 .menuButton {
