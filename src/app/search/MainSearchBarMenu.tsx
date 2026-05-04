@@ -4,11 +4,13 @@ import { querySelector } from 'app/shell/selectors';
 import { motion } from 'motion/react';
 import { useSelector } from 'react-redux';
 import { useLocation } from 'react-router';
+import InventoryArmorFilterMenu from './InventoryArmorFilterMenu';
+import * as styles from './MainSearchBarMenu.m.scss';
 import { searchButtonAnimateVariants } from './SearchBar';
 import { filteredItemsSelector, queryValidSelector } from './items/item-search-filter';
 
 /**
- * The three-dots dropdown menu of actions for the search bar that act on searched items.
+ * Inventory search bar actions: armor filter picker (left) and three-dot item actions menu.
  */
 export default function MainSearchBarMenu() {
   const location = useLocation();
@@ -29,12 +31,14 @@ export default function MainSearchBarMenu() {
     <motion.div
       layout
       key="action"
+      className={styles.cluster}
       variants={searchButtonAnimateVariants}
       exit="hidden"
       initial="hidden"
       animate="shown"
     >
       {promptDialog}
+      <InventoryArmorFilterMenu />
       <ItemActionsDropdown
         filteredItems={filteredItems}
         searchActive={showSearchCount}

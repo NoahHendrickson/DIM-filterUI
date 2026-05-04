@@ -110,6 +110,7 @@ export default (env: Env) => {
     devServer: env.dev
       ? {
           host: process.env.DOCKER ? '0.0.0.0' : 'localhost',
+          port: Number(process.env.DIM_DEV_PORT) || 8080,
           allowedHosts: 'all',
           server: {
             type: 'https',

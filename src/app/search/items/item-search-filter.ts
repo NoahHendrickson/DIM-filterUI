@@ -31,6 +31,7 @@ import memoizeOne from 'memoize-one';
 import { createSelector } from 'reselect';
 import { FilterContext, SuggestionsContext } from './item-filter-types';
 import advancedFilters from './search-filters/advanced';
+import archetypeFilters from './search-filters/armor-archetype';
 import d1Filters from './search-filters/d1-filters';
 import dupeFilters from './search-filters/dupes';
 import freeformFilters from './search-filters/freeform';
@@ -39,10 +40,12 @@ import knownValuesFilters from './search-filters/known-values';
 import loadoutFilters from './search-filters/loadouts';
 import simpleRangeFilters from './search-filters/range-numeric';
 import overloadedRangeFilters from './search-filters/range-overload';
+import setBonusFilters from './search-filters/setbonus';
 import simpleFilters from './search-filters/simple';
 import socketFilters from './search-filters/sockets';
 import statFilters from './search-filters/stats';
 import locationFilters from './search-filters/stores';
+import tuningFilters from './search-filters/tuning';
 import wishlistFilters from './search-filters/wishlist';
 
 const allFilters = [
@@ -60,6 +63,9 @@ const allFilters = [
   ...statFilters,
   ...locationFilters,
   ...advancedFilters,
+  ...archetypeFilters,
+  ...setBonusFilters,
+  ...tuningFilters,
 ];
 
 export const buildItemFiltersMap = memoizeOne((destinyVersion: DestinyVersion) =>

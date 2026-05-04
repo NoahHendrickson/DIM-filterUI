@@ -18,6 +18,7 @@ export const enabledIcon = faCheckCircle;
 export const unselectedCheckIcon = 'far fa-check-circle';
 export const settingsIcon = 'fas fa-cog';
 export const copyIcon = 'fas fa-copy';
+export const faFilter = 'fas fa-filter';
 export const downloadIcon = 'fas fa-file-export';
 export const sendIcon = 'fas fa-envelope';
 export const clearIcon = 'fas fa-eraser';

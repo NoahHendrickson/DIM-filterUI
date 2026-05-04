@@ -1,0 +1,65 @@
+@use '../variables.scss' as *;
+
+.menu {
+  z-index: 100;
+  min-width: 240px;
+  max-width: min(380px, 92vw);
+  max-height: min(72vh, 440px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--theme-search-dropdown-bg);
+  border: 1px solid var(--theme-search-dropdown-border);
+  border-radius: $theme-corner-radius-search;
+  box-shadow: 0 2px 8px rgb(0, 0, 0, 0.35);
+}
+
+.section {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--theme-search-dropdown-border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.sectionTitle {
+  padding: 8px 10px 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--theme-text-secondary);
+}
+
+.sectionBody {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 8px 8px;
+}
+
+.sectionBodyScroll {
+  overflow-y: auto;
+  max-height: 200px;
+}
+
+.chip {
+  composes: resetButton from '../dim-ui/common.m.scss';
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  background: rgb(128, 128, 128, 0.15);
+  color: var(--theme-text);
+  text-align: left;
+  max-width: 100%;
+
+  @include interactive($hover: true) {
+    background: var(--theme-accent-primary);
+    color: var(--theme-text-invert);
+  }
+}
+
+.menuButton {
+  composes: filterBarButton from './SearchBar.m.scss';
+  margin: 0;
+}
