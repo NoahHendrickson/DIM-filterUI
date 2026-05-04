@@ -406,6 +406,7 @@
     "ArmorFilterSectionArchetype": "Archetype",
     "ArmorFilterSectionSetBonus": "Armorset bonus",
     "ArmorFilterSectionTuning": "Tuning stat",
+    "ArmorFilterSectionTertiary": "Tertiary stat",
     "AutoRefresh": "DIM will automatically reload as long as you are still playing.",
     "BulkTag": "Bulk tag items",
     "BungieNetAlert": "Bungie Alert",

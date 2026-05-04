@@ -1,9 +1,10 @@
-export type ArmorKvFilterKeyword = 'setbonus' | 'archetype' | 'tuning';
+export type ArmorKvFilterKeyword = 'setbonus' | 'archetype' | 'tuning' | 'tertiarystat';
 
 const keywordPattern: Record<ArmorKvFilterKeyword, RegExp> = {
   setbonus: /\bsetbonus:\S+/g,
   archetype: /\barchetype:\S+/g,
   tuning: /\btuning:\S+/g,
+  tertiarystat: /\btertiarystat:\S+/g,
 };
 
 /** Replaces any existing `keyword:value` token, then appends the new clause (space-separated AND). */

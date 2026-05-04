@@ -2,7 +2,10 @@ import { destinyVersionSelector } from 'app/accounts/selectors';
 import { usePopper } from 'app/dim-ui/usePopper';
 import { t } from 'app/i18next-t';
 import { useD2Definitions } from 'app/manifest/selectors';
-import { applyArmorKvFilter } from 'app/search/armor-filter-query';
+import {
+  applyArmorKvFilter,
+  type ArmorKvFilterKeyword,
+} from 'app/search/armor-filter-query';
 import { realD2ArmorStatHashByName } from 'app/search/d2-known-values';
 import { armorArchetypeFilterNames } from 'app/search/items/search-filters/armor-archetype';
 import { getArmorSetBonusFilterOptions } from 'app/search/items/search-filters/setbonus';
@@ -31,7 +34,7 @@ function formatArchetypeLabel(name: string) {
 
 /**
  * Inventory-only quick picker for armor-related search filters. Appends `setbonus:`,
- * `archetype:`, and `tuning:` clauses using the same syntax as the search box.
+ * `archetype:`, `tuning:`, and `tertiarystat:` clauses using the same syntax as the search box.
  */
 export default function InventoryArmorFilterMenu() {
   const defs = useD2Definitions();
@@ -94,7 +97,7 @@ export default function InventoryArmorFilterMenu() {
     return null;
   }
 
-  const applyFilter = (keyword: 'setbonus' | 'archetype' | 'tuning', value: string) => {
+  const applyFilter = (keyword: ArmorKvFilterKeyword, value: string) => {
     dispatch(setSearchQuery(applyArmorKvFilter(query, keyword, value), true));
     setOpen(false);
   };
@@ -159,6 +162,23 @@ export default function InventoryArmorFilterMenu() {
                   role="menuitem"
                   title={`tuning:${key}`}
                   onClick={() => applyFilter('tuning', key)}
+                >
+                  {tuningStatLabels[key] ?? key}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className={styles.section}>
+            <div className={styles.sectionTitle}>{t('Header.ArmorFilterSectionTertiary')}</div>
+            <div className={styles.sectionBody}>
+              {tuningKeys.map((key) => (
+                <button
+                  key={`tertiary-${key}`}
+                  type="button"
+                  className={styles.chip}
+                  role="menuitem"
+                  title={`tertiarystat:${key}`}
+                  onClick={() => applyFilter('tertiarystat', key)}
                 >
                   {tuningStatLabels[key] ?? key}
                 </button>
