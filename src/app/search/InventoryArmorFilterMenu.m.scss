@@ -5,7 +5,8 @@
   min-width: 240px;
   max-width: min(380px, 92vw);
   max-height: min(72vh, 440px);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   background: var(--theme-search-dropdown-bg);
