@@ -36,6 +36,7 @@ function formatArchetypeLabel(name: string) {
 /**
  * Inventory-only quick picker for armor-related search filters. Appends `setbonus:`,
  * `archetype:`, `tunedstat:`, and `tertiarystat:` clauses using the same syntax as the search box.
+ * Multiple selections in a section combine with `or` (implicit `and` with other terms).
  */
 export default function InventoryArmorFilterMenu() {
   const defs = useD2Definitions();

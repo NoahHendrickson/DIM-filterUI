@@ -1,12 +1,5 @@
 export type ArmorKvFilterKeyword = 'setbonus' | 'archetype' | 'tunedstat' | 'tertiarystat';
 
-const keywordPattern: Record<ArmorKvFilterKeyword, RegExp> = {
-  setbonus: /\bsetbonus:\S+/g,
-  archetype: /\barchetype:\S+/g,
-  tunedstat: /\btunedstat:\S+/g,
-  tertiarystat: /\btertiarystat:\S+/g,
-};
-
 /** True when the trimmed query contains a whitespace-delimited token `keyword:value` (case-insensitive keyword and value match). */
 export function armorKvFilterIsActive(
   query: string,
@@ -23,26 +16,86 @@ export function armorKvFilterIsActive(
   return false;
 }
 
+function escapeKeywordForRegexp(keyword: ArmorKvFilterKeyword): string {
+  return keyword.replaceAll(/[\^$\\.*+?()[\]{}|]/g, String.raw`\$&`);
+}
+
+/** Collect ordered unique `keyword:` values appearing as whitespace-separated tokens (`or` is skipped). */
+function collectArmorKvKeywordValues(query: string, keyword: ArmorKvFilterKeyword): string[] {
+  const kw = keyword.toLowerCase();
+  const seenNorm = new Set<string>();
+  const values: string[] = [];
+
+  for (const tok of query.trim().split(/\s+/)) {
+    if (!tok.includes(':')) {
+      continue;
+    }
+    const idx = tok.indexOf(':');
+    if (idx < 1) {
+      continue;
+    }
+    if (tok.slice(0, idx).toLowerCase() !== kw) {
+      continue;
+    }
+    const val = tok.slice(idx + 1);
+    const norm = val.toLowerCase();
+    if (seenNorm.has(norm)) {
+      continue;
+    }
+    seenNorm.add(norm);
+    values.push(val);
+  }
+  return values;
+}
+
+/** Drop contiguous `keyword:*` OR-chains and any stray same-keyword tokens outside those chains. */
+function stripArmorKvKeywordTokens(query: string, keyword: ArmorKvFilterKeyword): string {
+  const k = escapeKeywordForRegexp(keyword);
+  const chainRe = new RegExp(`\\b${k}:\\S+(?:\\s+or\\s+${k}:\\S+)*`, 'gi');
+  const singleRe = new RegExp(`\\b${k}:\\S+`, 'gi');
+  let s = query;
+  let prev = '';
+  while (s !== prev) {
+    prev = s;
+    s = s.replace(chainRe, '').replace(/\s+/g, ' ').trim();
+  }
+  s = s.replace(singleRe, '').replace(/\s+/g, ' ').trim();
+  return s;
+}
+
+function buildArmorKvKeywordClause(keyword: ArmorKvFilterKeyword, values: string[]): string {
+  if (values.length === 0) {
+    return '';
+  }
+  const parts = values.map((v) => `${keyword}:${v}`);
+  return parts.length === 1 ? parts[0]! : parts.join(' or ');
+}
+
 /**
- * If `keyword:value` is already in the query, removes it. Otherwise replaces any existing token for
- * that keyword (e.g. all `tunedstat:*`) and appends the new clause (space-separated AND).
+ * Toggles `keyword:value` like the menu chips: removes that token when present; otherwise adds it.
+ * Multiple values for the same `keyword` are combined with `or` so they behave as OR within that section,
+ * consistent with perk-style queries (e.g. `archetype:a or archetype:b` AND-ed with surrounding terms).
  */
 export function applyArmorKvFilter(
   query: string,
   keyword: ArmorKvFilterKeyword,
   value: string,
 ): string {
-  if (armorKvFilterIsActive(query, keyword, value)) {
-    const remove = `${keyword}:${value}`.toLowerCase();
-    const next = query
-      .trim()
-      .split(/\s+/)
-      .filter((t) => t.toLowerCase() !== remove)
-      .join(' ')
-      .trim();
-    return next;
+  const norm = value.toLowerCase();
+  const existing = collectArmorKvKeywordValues(query, keyword);
+
+  let nextVals: string[];
+  if (existing.some((v) => v.toLowerCase() === norm)) {
+    nextVals = existing.filter((v) => v.toLowerCase() !== norm);
+  } else {
+    nextVals = [...existing, value];
   }
-  const stripped = query.replace(keywordPattern[keyword], '').replace(/\s+/g, ' ').trim();
-  const clause = `${keyword}:${value}`;
+
+  const stripped = stripArmorKvKeywordTokens(query, keyword);
+  const clause = buildArmorKvKeywordClause(keyword, nextVals);
+
+  if (!clause) {
+    return stripped;
+  }
   return stripped ? `${stripped} ${clause}` : clause;
 }
