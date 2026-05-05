@@ -65,6 +65,12 @@
   --theme-search-dropdown-bg: var(--theme-fill-modal-actions);
   --theme-search-dropdown-border: transparent;
 
+  // Inventory armor filter menu (popover from search bar)
+  --theme-armor-filter-menu-bg: var(--theme-search-dropdown-bg);
+  --theme-armor-filter-menu-border: var(--theme-search-dropdown-border);
+  --theme-armor-filter-chip-bg: rgb(128, 128, 128, 0.15);
+  --theme-armor-filter-menu-shadow: 0 2px 8px rgb(0, 0, 0, 0.35);
+
   // Items
   --theme-item-polaroid: #ddd;
   --theme-item-polaroid-txt: var(--theme-text-invert);
