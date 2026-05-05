@@ -2,8 +2,9 @@
 
 .menu {
   z-index: 100;
-  min-width: 240px;
-  max-width: min(380px, 92vw);
+  /* Enough width that archetype chips usually stay on one row; min() keeps narrow viewports wrapping */
+  min-width: min(400px, 92vw);
+  max-width: min(420px, 92vw);
   overflow: visible;
   display: flex;
   flex-direction: column;
