@@ -62,6 +62,18 @@
   --theme-search-dropdown-bg: var(--theme-fill-modal-actions);
   --theme-search-dropdown-border: rgb(255, 255, 255, 0.2);
 
+  // Inventory armor filter menu — Europa ice blue + gradient blues
+  --theme-armor-filter-menu-bg: color-mix(
+    in srgb,
+    var(--theme-fill-modal) 34%,
+    var(--theme-fill-modal-actions)
+  );
+  --theme-armor-filter-menu-border: rgb(255, 255, 255, 0.2);
+  --theme-armor-filter-chip-bg: rgb(255, 255, 255, 0.1);
+  --theme-armor-filter-menu-shadow:
+    0 4px 18px rgb(0, 0, 0, 0.5), 0 0 0 1px rgb(136, 203, 237, 0.09),
+    0 0 30px rgb(83, 118, 186, 0.16);
+
   // Items 'polaroid' framed icons
   --theme-item-polaroid: #fff;
   --theme-item-polaroid-txt: black;

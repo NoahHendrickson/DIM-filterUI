@@ -8,15 +8,16 @@
   display: flex;
   flex-direction: column;
   padding: 6px 0;
-  background: var(--theme-armor-filter-menu-bg);
-  border: 1px solid var(--theme-armor-filter-menu-border);
+  background: var(--theme-armor-filter-menu-bg, var(--theme-search-dropdown-bg));
+  border: 1px solid var(--theme-armor-filter-menu-border, var(--theme-search-dropdown-border));
   border-radius: $theme-corner-radius-search;
   box-shadow: var(--theme-armor-filter-menu-shadow);
 }
 
 .section {
   flex: 0 0 auto;
-  border-bottom: 1px solid var(--theme-armor-filter-menu-border);
+  border-bottom: 1px solid
+    var(--theme-armor-filter-menu-border, var(--theme-search-dropdown-border));
 
   &:last-child {
     border-bottom: none;

@@ -63,11 +63,11 @@
   // Background color for the search bar. Distinguishes it from theme-header-nav-bg.
   --theme-search-bg: rgb(0, 0, 0, 0.4);
   --theme-search-dropdown-bg: var(--theme-fill-modal-actions);
-  --theme-search-dropdown-border: transparent;
+  --theme-search-dropdown-border: rgb(255, 255, 255, 0.2);
 
   // Inventory armor filter menu (popover from search bar)
-  --theme-armor-filter-menu-bg: var(--theme-search-dropdown-bg);
-  --theme-armor-filter-menu-border: var(--theme-search-dropdown-border);
+  // See InventoryArmorFilterMenu.m.scss: use var(--theme-armor-filter-*, var(--theme-search-*))
+  // so borders/background follow each theme’s search tokens (not :root’s computed snapshot).
   --theme-armor-filter-chip-bg: rgb(128, 128, 128, 0.15);
   --theme-armor-filter-menu-shadow: 0 2px 8px rgb(0, 0, 0, 0.35);
 

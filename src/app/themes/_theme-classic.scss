@@ -21,4 +21,6 @@
 
   // Background color for the search bar. Distinguishes it from theme-header-nav-bg.
   --theme-search-bg: var(--theme-app-bg);
+  // Same visible edge as Pyramid / other dark themes (dropdown, armor filter menu).
+  --theme-search-dropdown-border: rgb(255, 255, 255, 0.2);
 }
