@@ -6,6 +6,8 @@ import { ItemFilterDefinition } from '../item-filter-types';
 const tuningFilters: ItemFilterDefinition[] = [
   {
     keywords: 'tuning',
+    /** Prefer `tunedstat:` (same behavior for stat names); keep parsing legacy searches. */
+    deprecated: true,
     description: tl('Filter.TuningStat'),
     format: 'query',
     suggestions: Object.keys(realD2ArmorStatHashByName),

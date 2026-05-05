@@ -4,11 +4,10 @@
   z-index: 100;
   min-width: 240px;
   max-width: min(380px, 92vw);
-  max-height: min(72vh, 440px);
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: visible;
   display: flex;
   flex-direction: column;
+  padding: 6px 0;
   background: var(--theme-search-dropdown-bg);
   border: 1px solid var(--theme-search-dropdown-border);
   border-radius: $theme-corner-radius-search;
@@ -25,7 +24,7 @@
 }
 
 .sectionTitle {
-  padding: 8px 10px 4px;
+  padding: 10px 12px 6px;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -35,13 +34,8 @@
 .sectionBody {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 4px 8px 8px;
-}
-
-.sectionBodyScroll {
-  overflow-y: auto;
-  max-height: 200px;
+  gap: 6px;
+  padding: 6px 12px 12px;
 }
 
 .chip {
@@ -63,6 +57,7 @@
 }
 
 .chipActive {
+  background: color-mix(in srgb, var(--theme-accent-primary) 8%, transparent);
   outline-color: var(--theme-accent-primary);
 }
 

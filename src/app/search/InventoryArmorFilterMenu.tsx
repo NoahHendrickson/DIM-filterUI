@@ -35,7 +35,7 @@ function formatArchetypeLabel(name: string) {
 
 /**
  * Inventory-only quick picker for armor-related search filters. Appends `setbonus:`,
- * `archetype:`, `tuning:`, and `tertiarystat:` clauses using the same syntax as the search box.
+ * `archetype:`, `tunedstat:`, and `tertiarystat:` clauses using the same syntax as the search box.
  */
 export default function InventoryArmorFilterMenu() {
   const defs = useD2Definitions();
@@ -122,7 +122,7 @@ export default function InventoryArmorFilterMenu() {
         <div ref={menuRef} className={styles.menu} role="menu">
           <div className={styles.section}>
             <div className={styles.sectionTitle}>{t('Header.ArmorFilterSectionSetBonus')}</div>
-            <div className={clsx(styles.sectionBody, styles.sectionBodyScroll)}>
+            <div className={styles.sectionBody}>
               {setBonuses.map(({ slug, label }) => (
                 <button
                   key={slug}
@@ -161,10 +161,10 @@ export default function InventoryArmorFilterMenu() {
                 <button
                   key={key}
                   type="button"
-                  className={clsx(styles.chip, isActive('tuning', key) && styles.chipActive)}
+                  className={clsx(styles.chip, isActive('tunedstat', key) && styles.chipActive)}
                   role="menuitem"
-                  title={`tuning:${key}`}
-                  onClick={() => applyFilter('tuning', key)}
+                  title={`tunedstat:${key}`}
+                  onClick={() => applyFilter('tunedstat', key)}
                 >
                   {tuningStatLabels[key] ?? key}
                 </button>

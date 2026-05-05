@@ -2,11 +2,11 @@
 // Please do not change this file!
 interface CssExports {
   'chip': string;
+  'chipActive': string;
   'menu': string;
   'menuButton': string;
   'section': string;
   'sectionBody': string;
-  'sectionBodyScroll': string;
   'sectionTitle': string;
 }
 export const cssExports: CssExports;
