@@ -4,14 +4,16 @@ import { DimItem } from 'app/inventory/item-types';
 import { DefItemIcon } from 'app/inventory/ItemIcon';
 import { allItemsSelector, createItemContextSelector } from 'app/inventory/selectors';
 import { makeFakeItem } from 'app/inventory/store/d2-item-factory';
-import { getExoticClassItemPerkHashes } from 'app/inventory/store/exotic-class-item';
+import {
+  getExoticClassItemPerkHashes,
+  isExoticClassItemWithPerks,
+} from 'app/inventory/store/exotic-class-item';
 import { isPluggableItem } from 'app/inventory/store/sockets';
 import { PlugDefTooltip } from 'app/item-popup/PlugTooltip';
 import LoadoutEditSection from 'app/loadout/loadout-edit/LoadoutEditSection';
 import { useD2Definitions } from 'app/manifest/selectors';
 import { getExtraIntrinsicPerkSockets } from 'app/utils/socket-utils';
-import { DestinyClass, DestinyItemSubType } from 'bungie-api-ts/destiny2';
-import { BucketHashes } from 'data/d2/generated-enums';
+import { DestinyClass } from 'bungie-api-ts/destiny2';
 import { sample } from 'es-toolkit';
 import anyExoticIcon from 'images/anyExotic.svg';
 import noExoticIcon from 'images/noExotic.svg';
@@ -59,7 +61,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
       (i) => i.equipped && i.isExotic && i.bucket.inArmor && i.owner === storeId && i.energy,
     );
     lbDispatch({ type: 'lockExotic', lockedExoticHash: equippedExotic?.hash });
-    if (equippedExotic?.bucket.hash === BucketHashes.ClassArmor) {
+    if (equippedExotic && isExoticClassItemWithPerks(equippedExotic.hash)) {
       const equippedPerks = getExtraIntrinsicPerkSockets(equippedExotic)
         .map((s) => s.plugged?.plugDef.hash)
         .filter((h): h is number => h !== undefined);
@@ -80,7 +82,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
     }
     const randomExotic = sample(exotics);
     lbDispatch({ type: 'lockExotic', lockedExoticHash: randomExotic.def.hash });
-    if (randomExotic.def.itemSubType === DestinyItemSubType.ClassArmor) {
+    if (isExoticClassItemWithPerks(randomExotic.def.hash)) {
       const ownedRolls = allItems.filter(
         (i) => i.hash === randomExotic.def.hash && getExtraIntrinsicPerkSockets(i).length > 0,
       );
@@ -102,11 +104,8 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
   const handleClickEdit = () => setShowExoticPicker(true);
   const handleClickEditPerk = () => setShowExoticPerkPicker(true);
 
-  const isClassItem =
-    lockedExoticHash !== undefined &&
-    defs.InventoryItem.get(lockedExoticHash)?.itemSubType === DestinyItemSubType.ClassArmor;
-  const hasOwnedClassItemRoll =
-    isClassItem &&
+  const canPickPerks =
+    isExoticClassItemWithPerks(lockedExoticHash) &&
     allItems.some((i) => i.hash === lockedExoticHash && getExtraIntrinsicPerkSockets(i).length > 0);
 
   return (
@@ -118,7 +117,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
       onRandomize={handleRandomize}
     >
       <ChosenExoticOption lockedExoticHash={lockedExoticHash} onClick={handleClickEdit} />
-      {hasOwnedClassItemRoll && (perks ?? []).some((p) => p !== 0) && (
+      {canPickPerks && (perks ?? []).some((p) => p !== 0) && (
         <div className={styles.selectedPerks} onClick={handleClickEditPerk}>
           {(perks ?? [])
             .filter((p) => p !== 0)
@@ -145,7 +144,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
         <button type="button" className="dim-button" onClick={handleClickEdit}>
           {t('LB.SelectExotic')}
         </button>
-        {hasOwnedClassItemRoll && (
+        {canPickPerks && (
           <button type="button" className="dim-button" onClick={handleClickEditPerk}>
             {t('LB.SelectPerks')}
           </button>
@@ -159,8 +158,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
           onSelected={(exotic) => {
             lbDispatch({ type: 'lockExotic', lockedExoticHash: exotic });
             if (
-              exotic &&
-              defs.InventoryItem.get(exotic)?.itemSubType === DestinyItemSubType.ClassArmor &&
+              isExoticClassItemWithPerks(exotic) &&
               allItems.some((i) => i.hash === exotic && getExtraIntrinsicPerkSockets(i).length > 0)
             ) {
               setShowExoticPerkPicker(true);
@@ -247,7 +245,7 @@ function ChosenExoticOption({
           exoticMods,
           isArmor1: Boolean(fakeItem?.energy),
         });
-        if (fakeItem.bucket.hash === BucketHashes.ClassArmor) {
+        if (isExoticClassItemWithPerks(fakeItem.hash)) {
           info.description = undefined;
         }
         break;

@@ -41,3 +41,11 @@ export function getExoticClassItemPerkHashes(exoticHash: number | undefined): nu
         .flat()
     : [];
 }
+
+/**
+ * Whether the given item hash corresponds to an exotic class item we have perk-picker support
+ * for (i.e. has an entry in {@link exoticClassItemPlugs}).
+ */
+export function isExoticClassItemWithPerks(itemHash: number | undefined): boolean {
+  return itemHash !== undefined && exoticClassItemPlugs[itemHash] !== undefined;
+}
