@@ -300,10 +300,10 @@ export function ExoticPerkPicker({
   }, [allItems, lockedExoticHash]);
 
   const [selectedPerk1, setSelectedPerk1] = useState<number>(
-    () => initialPerks?.find((p) => column1Pairs.has(p)) ?? 0,
+    () => initialPerks?.find((p) => column1All.includes(p)) ?? 0,
   );
   const [selectedPerk2, setSelectedPerk2] = useState<number>(
-    () => initialPerks?.find((p) => column2Pairs.has(p)) ?? 0,
+    () => initialPerks?.find((p) => column2All.includes(p)) ?? 0,
   );
 
   const handlePerk1Click = (hash: number) => () =>

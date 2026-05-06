@@ -100,9 +100,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
   const handleClickEdit = () => setShowExoticPicker(true);
   const handleClickEditPerk = () => setShowExoticPerkPicker(true);
 
-  const canPickPerks =
-    isExoticClassItemWithPerks(lockedExoticHash) &&
-    allItems.some((i) => i.hash === lockedExoticHash && getExtraIntrinsicPerkSockets(i).length > 0);
+  const showPerks = isExoticClassItemWithPerks(lockedExoticHash);
   // Render selected perks in the same left-to-right order as the picker.
   const canonicalPerkOrder = getExoticClassItemPerkHashes(lockedExoticHash);
   const orderedPerks = (perks ?? [])
@@ -118,7 +116,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
       onRandomize={handleRandomize}
     >
       <ChosenExoticOption lockedExoticHash={lockedExoticHash} onClick={handleClickEdit} />
-      {canPickPerks && orderedPerks.length > 0 && (
+      {showPerks && orderedPerks.length > 0 && (
         <div className={styles.selectedPerks} onClick={handleClickEditPerk}>
           {orderedPerks.map((perkHash) => {
             const def = defs.InventoryItem.get(perkHash);
@@ -143,7 +141,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
         <button type="button" className="dim-button" onClick={handleClickEdit}>
           {t('LB.SelectExotic')}
         </button>
-        {canPickPerks && (
+        {showPerks && (
           <button type="button" className="dim-button" onClick={handleClickEditPerk}>
             {t('LB.SelectPerks')}
           </button>
@@ -156,10 +154,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
           classType={classType}
           onSelected={(exotic) => {
             lbDispatch({ type: 'lockExotic', lockedExoticHash: exotic });
-            if (
-              isExoticClassItemWithPerks(exotic) &&
-              allItems.some((i) => i.hash === exotic && getExtraIntrinsicPerkSockets(i).length > 0)
-            ) {
+            if (isExoticClassItemWithPerks(exotic)) {
               setShowExoticPerkPicker(true);
             }
           }}
