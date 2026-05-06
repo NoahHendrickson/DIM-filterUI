@@ -171,6 +171,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
       )}
       {showExoticPerkPicker && (
         <ExoticPerkPicker
+          key={lockedExoticHash}
           lockedExoticHash={lockedExoticHash}
           initialPerks={perks}
           onSelected={({ removed, added }) => lbDispatch({ type: 'updatePerks', removed, added })}
