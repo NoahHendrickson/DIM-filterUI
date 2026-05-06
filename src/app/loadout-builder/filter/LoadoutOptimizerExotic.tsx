@@ -52,6 +52,22 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
   const defs = useD2Definitions()!;
   const allItems = useSelector(allItemsSelector);
 
+  const dispatchPerksFromItem = (item: DimItem) => {
+    if (!isExoticClassItemWithPerks(item.hash)) {
+      return;
+    }
+    const added = getExtraIntrinsicPerkSockets(item)
+      .map((s) => s.plugged?.plugDef.hash)
+      .filter((h): h is number => h !== undefined);
+    if (added.length > 0) {
+      lbDispatch({
+        type: 'updatePerks',
+        removed: getExoticClassItemPerkHashes(item.hash),
+        added,
+      });
+    }
+  };
+
   const handleClear = () => {
     lbDispatch({ type: 'removeLockedExotic' });
   };
@@ -61,17 +77,8 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
       (i) => i.equipped && i.isExotic && i.bucket.inArmor && i.owner === storeId && i.energy,
     );
     lbDispatch({ type: 'lockExotic', lockedExoticHash: equippedExotic?.hash });
-    if (equippedExotic && isExoticClassItemWithPerks(equippedExotic.hash)) {
-      const equippedPerks = getExtraIntrinsicPerkSockets(equippedExotic)
-        .map((s) => s.plugged?.plugDef.hash)
-        .filter((h): h is number => h !== undefined);
-      if (equippedPerks.length > 0) {
-        lbDispatch({
-          type: 'updatePerks',
-          removed: getExoticClassItemPerkHashes(equippedExotic.hash),
-          added: equippedPerks,
-        });
-      }
+    if (equippedExotic) {
+      dispatchPerksFromItem(equippedExotic);
     }
   };
 
@@ -82,22 +89,11 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
     }
     const randomExotic = sample(exotics);
     lbDispatch({ type: 'lockExotic', lockedExoticHash: randomExotic.def.hash });
-    if (isExoticClassItemWithPerks(randomExotic.def.hash)) {
-      const ownedRolls = allItems.filter(
-        (i) => i.hash === randomExotic.def.hash && getExtraIntrinsicPerkSockets(i).length > 0,
-      );
-      if (ownedRolls.length > 0) {
-        const randomPerks = getExtraIntrinsicPerkSockets(sample(ownedRolls))
-          .map((s) => s.plugged?.plugDef.hash)
-          .filter((h): h is number => h !== undefined);
-        if (randomPerks.length > 0) {
-          lbDispatch({
-            type: 'updatePerks',
-            removed: getExoticClassItemPerkHashes(randomExotic.def.hash),
-            added: randomPerks,
-          });
-        }
-      }
+    const ownedRolls = allItems.filter(
+      (i) => i.hash === randomExotic.def.hash && getExtraIntrinsicPerkSockets(i).length > 0,
+    );
+    if (ownedRolls.length > 0) {
+      dispatchPerksFromItem(sample(ownedRolls));
     }
   };
 
@@ -107,6 +103,11 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
   const canPickPerks =
     isExoticClassItemWithPerks(lockedExoticHash) &&
     allItems.some((i) => i.hash === lockedExoticHash && getExtraIntrinsicPerkSockets(i).length > 0);
+  // Render selected perks in the same left-to-right order as the picker.
+  const canonicalPerkOrder = getExoticClassItemPerkHashes(lockedExoticHash);
+  const orderedPerks = (perks ?? [])
+    .filter((p) => p !== 0)
+    .toSorted((a, b) => canonicalPerkOrder.indexOf(a) - canonicalPerkOrder.indexOf(b));
 
   return (
     <LoadoutEditSection
@@ -117,27 +118,25 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
       onRandomize={handleRandomize}
     >
       <ChosenExoticOption lockedExoticHash={lockedExoticHash} onClick={handleClickEdit} />
-      {canPickPerks && (perks ?? []).some((p) => p !== 0) && (
+      {canPickPerks && orderedPerks.length > 0 && (
         <div className={styles.selectedPerks} onClick={handleClickEditPerk}>
-          {(perks ?? [])
-            .filter((p) => p !== 0)
-            .map((perkHash) => {
-              const def = defs.InventoryItem.get(perkHash);
-              return (
-                def &&
-                isPluggableItem(def) && (
-                  <PressTip
-                    key={perkHash}
-                    tooltip={<PlugDefTooltip def={def} />}
-                    placement="top"
-                    className={styles.selectedPerk}
-                  >
-                    <DefItemIcon itemDef={def} />
-                    {def.displayProperties.name}
-                  </PressTip>
-                )
-              );
-            })}
+          {orderedPerks.map((perkHash) => {
+            const def = defs.InventoryItem.get(perkHash);
+            return (
+              def &&
+              isPluggableItem(def) && (
+                <PressTip
+                  key={perkHash}
+                  tooltip={<PlugDefTooltip def={def} />}
+                  placement="top"
+                  className={styles.selectedPerk}
+                >
+                  <DefItemIcon itemDef={def} />
+                  {def.displayProperties.name}
+                </PressTip>
+              )
+            );
+          })}
         </div>
       )}
       <div className={styles.buttons}>

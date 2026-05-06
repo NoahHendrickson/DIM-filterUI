@@ -49,3 +49,27 @@ export function getExoticClassItemPerkHashes(exoticHash: number | undefined): nu
 export function isExoticClassItemWithPerks(itemHash: number | undefined): boolean {
   return itemHash !== undefined && exoticClassItemPlugs[itemHash] !== undefined;
 }
+
+/**
+ * Returns the full list of perk hashes for whichever intrinsic perk column contains the given
+ * perk hash on the given exotic class item. Returns undefined if the exotic or perk isn't tracked
+ * in our manual table. Used to enforce one-perk-per-column when toggling perks.
+ */
+export function getExoticClassItemPerkColumn(
+  exoticHash: number | undefined,
+  perkHash: number,
+): number[] | undefined {
+  if (exoticHash === undefined) {
+    return undefined;
+  }
+  const plugsBySocket = exoticClassItemPlugs[exoticHash];
+  if (!plugsBySocket) {
+    return undefined;
+  }
+  for (const plugs of Object.values(plugsBySocket)) {
+    if (plugs?.includes(perkHash)) {
+      return plugs;
+    }
+  }
+  return undefined;
+}

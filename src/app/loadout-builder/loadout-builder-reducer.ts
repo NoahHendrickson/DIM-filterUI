@@ -14,7 +14,10 @@ import { t } from 'app/i18next-t';
 import { DimItem, PluggableInventoryItemDefinition } from 'app/inventory/item-types';
 import { allItemsSelector } from 'app/inventory/selectors';
 import { DimStore } from 'app/inventory/store-types';
-import { getExoticClassItemPerkHashes } from 'app/inventory/store/exotic-class-item';
+import {
+  getExoticClassItemPerkColumn,
+  getExoticClassItemPerkHashes,
+} from 'app/inventory/store/exotic-class-item';
 import { isPluggableItem } from 'app/inventory/store/sockets';
 import { getCurrentStore } from 'app/inventory/stores-helpers';
 import {
@@ -276,6 +279,7 @@ type LoadoutBuilderConfigAction =
   | { type: 'lockExotic'; lockedExoticHash: number | undefined }
   | { type: 'removeLockedExotic' }
   | { type: 'updatePerks'; removed: number[]; added: number[] }
+  | { type: 'togglePerk'; perkHash: number; exoticHash: number }
   | { type: 'dismissComparisonStats' }
   | { type: 'setSearchQuery'; query: string };
 
@@ -551,6 +555,19 @@ function lbConfigReducer(defs: D2ManifestDefinitions) {
       case 'updatePerks': {
         const { removed, added } = action;
         return updateLoadout(state, setLoadoutPerks({ removed, added }));
+      }
+      case 'togglePerk': {
+        const { perkHash, exoticHash } = action;
+        return updateLoadout(state, (loadout) => {
+          const currentPerks = loadout.parameters?.perks ?? [];
+          if (currentPerks.includes(perkHash)) {
+            return setLoadoutPerks({ removed: [perkHash] })(loadout);
+          }
+          // Replace any currently-selected perk in the same column.
+          const columnPerks = getExoticClassItemPerkColumn(exoticHash, perkHash);
+          const removed = columnPerks ? currentPerks.filter((p) => columnPerks.includes(p)) : [];
+          return setLoadoutPerks({ removed, added: [perkHash] })(loadout);
+        });
       }
       case 'autoStatModsChanged':
         return updateLoadout(state, setLoadoutParameters({ autoStatMods: action.autoStatMods }));
