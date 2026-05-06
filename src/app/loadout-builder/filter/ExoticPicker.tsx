@@ -260,44 +260,50 @@ export function ExoticPerkPicker({
   onClose,
 }: {
   lockedExoticHash?: number;
-  /** Perk hashes to pre-select; matched to row1/row2 by checking which row each hash belongs to. */
+  /** Perk hashes to pre-select; matched to a column by checking which column each hash belongs to. */
   initialPerks?: number[];
   onSelected: (changes: { removed: number[]; added: number[] }) => void;
   onClose: () => void;
 }) {
   const defs = useD2Definitions()!;
-  const allItems = useSelector(allItemsSelector).filter((item) => item.hash === lockedExoticHash);
+  const allItems = useSelector(allItemsSelector);
 
   const allPlugs =
     lockedExoticHash !== undefined ? exoticClassItemPlugs[lockedExoticHash] : undefined;
-  const row1All = allPlugs?.[10] ?? [];
-  const row2All = allPlugs?.[11] ?? [];
+  const column1All = allPlugs?.[10] ?? [];
+  const column2All = allPlugs?.[11] ?? [];
 
-  // Pairings observed on the player's owned rolls: row1 perk -> set of row2 perks seen with it,
-  // and vice versa. Drives both ownership-based disabling and combination-based disabling.
-  const row1Pairs = new Map<number, Set<number>>();
-  const row2Pairs = new Map<number, Set<number>>();
-  for (const item of allItems) {
-    const perks = getExtraIntrinsicPerkSockets(item);
-    if (perks?.length === 2 && perks[0].plugged?.plugDef.hash && perks[1].plugged?.plugDef.hash) {
-      const a = perks[0].plugged.plugDef.hash;
-      const b = perks[1].plugged.plugDef.hash;
-      if (!row1Pairs.has(a)) {
-        row1Pairs.set(a, new Set());
+  // Pairings observed on the player's owned rolls: column1 perk -> set of column2 perks seen with
+  // it, and vice versa. Drives both ownership-based disabling and combination-based disabling.
+  const { column1Pairs, column2Pairs } = useMemo(() => {
+    const c1 = new Map<number, Set<number>>();
+    const c2 = new Map<number, Set<number>>();
+    for (const item of allItems) {
+      if (item.hash !== lockedExoticHash) {
+        continue;
       }
-      row1Pairs.get(a)!.add(b);
-      if (!row2Pairs.has(b)) {
-        row2Pairs.set(b, new Set());
+      const perks = getExtraIntrinsicPerkSockets(item);
+      if (perks?.length === 2 && perks[0].plugged?.plugDef.hash && perks[1].plugged?.plugDef.hash) {
+        const a = perks[0].plugged.plugDef.hash;
+        const b = perks[1].plugged.plugDef.hash;
+        if (!c1.has(a)) {
+          c1.set(a, new Set());
+        }
+        c1.get(a)!.add(b);
+        if (!c2.has(b)) {
+          c2.set(b, new Set());
+        }
+        c2.get(b)!.add(a);
       }
-      row2Pairs.get(b)!.add(a);
     }
-  }
+    return { column1Pairs: c1, column2Pairs: c2 };
+  }, [allItems, lockedExoticHash]);
 
   const [selectedPerk1, setSelectedPerk1] = useState<number>(
-    () => initialPerks?.find((p) => row1Pairs.has(p)) ?? 0,
+    () => initialPerks?.find((p) => column1Pairs.has(p)) ?? 0,
   );
   const [selectedPerk2, setSelectedPerk2] = useState<number>(
-    () => initialPerks?.find((p) => row2Pairs.has(p)) ?? 0,
+    () => initialPerks?.find((p) => column2Pairs.has(p)) ?? 0,
   );
 
   const handlePerk1Click = (hash: number) => () =>
@@ -312,7 +318,7 @@ export function ExoticPerkPicker({
       onSubmit={(event) => {
         event.preventDefault();
         onSelected({
-          removed: [...row1All, ...row2All],
+          removed: [...column1All, ...column2All],
           added: [selectedPerk1, selectedPerk2].filter((p) => p !== 0),
         });
         onClose();
@@ -333,15 +339,15 @@ export function ExoticPerkPicker({
     >
       <div className={styles.container}>
         <TileGrid header={t('LB.ClassItemPerkLeftColumn')}>
-          {row1All
+          {column1All
             .map((perkHash) => defs.InventoryItem.get(perkHash))
             .map((perkDef) => (
               <TileGridTile
                 key={perkDef.hash}
                 selected={selectedPerk1 === perkDef.hash}
                 disabled={
-                  !row1Pairs.has(perkDef.hash) ||
-                  (selectedPerk2 !== 0 && !row2Pairs.get(selectedPerk2)?.has(perkDef.hash))
+                  !column1Pairs.has(perkDef.hash) ||
+                  (selectedPerk2 !== 0 && !column2Pairs.get(selectedPerk2)?.has(perkDef.hash))
                 }
                 title={perkDef.displayProperties.name}
                 icon={<DefItemIcon itemDef={perkDef} />}
@@ -352,15 +358,15 @@ export function ExoticPerkPicker({
             ))}
         </TileGrid>
         <TileGrid header={t('LB.ClassItemPerkRightColumn')}>
-          {row2All
+          {column2All
             .map((perkHash) => defs.InventoryItem.get(perkHash))
             .map((perkDef) => (
               <TileGridTile
                 key={perkDef.hash}
                 selected={selectedPerk2 === perkDef.hash}
                 disabled={
-                  !row2Pairs.has(perkDef.hash) ||
-                  (selectedPerk1 !== 0 && !row1Pairs.get(selectedPerk1)?.has(perkDef.hash))
+                  !column2Pairs.has(perkDef.hash) ||
+                  (selectedPerk1 !== 0 && !column1Pairs.get(selectedPerk1)?.has(perkDef.hash))
                 }
                 title={perkDef.displayProperties.name}
                 icon={<DefItemIcon itemDef={perkDef} />}
@@ -408,8 +414,8 @@ function Footer({
         {acceptButtonText}
       </button>
       <SheetHorizontalScrollContainer className={styles.selectedPerks}>
-        {selectedPerk1 !== 0 && <>{displayPerk(selectedPerk1)}</>}
-        {selectedPerk2 !== 0 && <>{displayPerk(selectedPerk2)}</>}
+        {selectedPerk1 !== 0 && displayPerk(selectedPerk1)}
+        {selectedPerk2 !== 0 && displayPerk(selectedPerk2)}
       </SheetHorizontalScrollContainer>
     </div>
   );
