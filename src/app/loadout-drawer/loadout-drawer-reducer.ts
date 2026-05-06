@@ -568,7 +568,13 @@ export function setLoadoutParameters(params: Partial<LoadoutParameters>): Loadou
  * @param added list of perks to add to the loadout
  * @returns a LoadoutUpdateFunction that applies the given perk changes
  */
-export function setLoadoutPerks(removed: number[], added: number[]): LoadoutUpdateFunction {
+export function setLoadoutPerks({
+  removed = [],
+  added = [],
+}: {
+  removed?: number[];
+  added?: number[];
+}): LoadoutUpdateFunction {
   return (loadout) => {
     const perks = [...(loadout.parameters?.perks ?? [])];
     for (const r of removed) {

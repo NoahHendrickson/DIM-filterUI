@@ -14,6 +14,7 @@ import { t } from 'app/i18next-t';
 import { DimItem, PluggableInventoryItemDefinition } from 'app/inventory/item-types';
 import { allItemsSelector } from 'app/inventory/selectors';
 import { DimStore } from 'app/inventory/store-types';
+import { exoticClassItemPlugs } from 'app/inventory/store/exotic-class-item';
 import { isPluggableItem } from 'app/inventory/store/sockets';
 import { getCurrentStore } from 'app/inventory/stores-helpers';
 import {
@@ -309,6 +310,14 @@ function lbUIReducer(state: LoadoutBuilderUI, action: LoadoutBuilderUIAction) {
   }
 }
 
+function exoticClassItemPerkHashes(exoticHash: number | undefined): number[] {
+  return exoticHash !== undefined
+    ? Object.values(exoticClassItemPlugs[exoticHash] ?? {})
+        .filter((p): p is number[] => p !== undefined)
+        .flat()
+    : [];
+}
+
 function lbConfigReducer(defs: D2ManifestDefinitions) {
   return (
     state: LoadoutBuilderConfiguration,
@@ -336,7 +345,11 @@ function lbConfigReducer(defs: D2ManifestDefinitions) {
         // Always remove the subclass
         loadout = clearSubclass(defs)(loadout);
 
-        // And the exotic
+        // And the exotic — clear any locked exotic class item perks too
+        const previousExoticHash = loadout.parameters?.exoticArmorHash;
+        loadout = setLoadoutPerks({
+          removed: exoticClassItemPerkHashes(previousExoticHash),
+        })(loadout);
         let loadoutParameters = {
           ...loadout.parameters,
           exoticArmorHash: undefined,
@@ -520,19 +533,33 @@ function lbConfigReducer(defs: D2ManifestDefinitions) {
         return updateLoadout(state, removeMod(action.mod));
       case 'lockExotic': {
         const { lockedExoticHash } = action;
-        return updateLoadout(
-          state,
-          setLoadoutParameters({ exoticArmorHash: lockedExoticHash, perks: undefined }),
-        );
+        return updateLoadout(state, (loadout) => {
+          const previousHash = loadout.parameters?.exoticArmorHash;
+          if (previousHash === lockedExoticHash) {
+            return loadout;
+          }
+          const cleared = setLoadoutPerks({
+            removed: exoticClassItemPerkHashes(previousHash),
+          })(loadout);
+          return {
+            ...cleared,
+            parameters: { ...cleared.parameters, exoticArmorHash: lockedExoticHash },
+          };
+        });
       }
       case 'removeLockedExotic':
-        return updateLoadout(
-          state,
-          setLoadoutParameters({ exoticArmorHash: undefined, perks: undefined }),
-        );
+        return updateLoadout(state, (loadout) => {
+          const cleared = setLoadoutPerks({
+            removed: exoticClassItemPerkHashes(loadout.parameters?.exoticArmorHash),
+          })(loadout);
+          return {
+            ...cleared,
+            parameters: { ...cleared.parameters, exoticArmorHash: undefined },
+          };
+        });
       case 'updatePerks': {
         const { removed, added } = action;
-        return updateLoadout(state, setLoadoutPerks(removed, added));
+        return updateLoadout(state, setLoadoutPerks({ removed, added }));
       }
       case 'autoStatModsChanged':
         return updateLoadout(state, setLoadoutParameters({ autoStatMods: action.autoStatMods }));
