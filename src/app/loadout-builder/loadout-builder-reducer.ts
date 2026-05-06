@@ -279,7 +279,7 @@ type LoadoutBuilderConfigAction =
   | { type: 'lockExotic'; lockedExoticHash: number | undefined }
   | { type: 'removeLockedExotic' }
   | { type: 'updatePerks'; removed: number[]; added: number[] }
-  | { type: 'togglePerk'; perkHash: number; exoticHash: number }
+  | { type: 'toggleExoticClassItemPerk'; perkHash: number; exoticHash: number }
   | { type: 'dismissComparisonStats' }
   | { type: 'setSearchQuery'; query: string };
 
@@ -556,7 +556,7 @@ function lbConfigReducer(defs: D2ManifestDefinitions) {
         const { removed, added } = action;
         return updateLoadout(state, setLoadoutPerks({ removed, added }));
       }
-      case 'togglePerk': {
+      case 'toggleExoticClassItemPerk': {
         const { perkHash, exoticHash } = action;
         return updateLoadout(state, (loadout) => {
           const currentPerks = loadout.parameters?.perks ?? [];

@@ -72,7 +72,11 @@ export default function GeneratedSetItem({
       // but the exotic picker is not the way to do it.
       if (isExoticClassItemWithPerks(item.hash)) {
         lbDispatch({ type: 'lockExotic', lockedExoticHash: item.hash });
-        lbDispatch({ type: 'togglePerk', perkHash: plugDef.hash, exoticHash: item.hash });
+        lbDispatch({
+          type: 'toggleExoticClassItemPerk',
+          perkHash: plugDef.hash,
+          exoticHash: item.hash,
+        });
       } else if (item.isExotic) {
         lbDispatch({ type: 'lockExotic', lockedExoticHash: item.hash });
       } else {
