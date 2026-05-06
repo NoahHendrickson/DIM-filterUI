@@ -58,6 +58,14 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
       (i) => i.equipped && i.isExotic && i.bucket.inArmor && i.owner === storeId && i.energy,
     );
     lbDispatch({ type: 'lockExotic', lockedExoticHash: equippedExotic?.hash });
+    if (equippedExotic?.bucket.hash === BucketHashes.ClassArmor) {
+      const equippedPerks = getExtraIntrinsicPerkSockets(equippedExotic)
+        .map((s) => s.plugged?.plugDef.hash)
+        .filter((h): h is number => h !== undefined);
+      if (equippedPerks.length > 0) {
+        lbDispatch({ type: 'updatePerks', removed: perks ?? [], added: equippedPerks });
+      }
+    }
   };
 
   const handleRandomize = () => {
