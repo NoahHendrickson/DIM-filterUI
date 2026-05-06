@@ -12,7 +12,7 @@ import { isPluggableItem } from 'app/inventory/store/sockets';
 import { PlugDefTooltip } from 'app/item-popup/PlugTooltip';
 import LoadoutEditSection from 'app/loadout/loadout-edit/LoadoutEditSection';
 import { useD2Definitions } from 'app/manifest/selectors';
-import { getExtraIntrinsicPerkSockets } from 'app/utils/socket-utils';
+import { getExtraIntrinsicPerkHashes, getExtraIntrinsicPerkSockets } from 'app/utils/socket-utils';
 import { DestinyClass } from 'bungie-api-ts/destiny2';
 import { sample } from 'es-toolkit';
 import anyExoticIcon from 'images/anyExotic.svg';
@@ -56,9 +56,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
     if (!isExoticClassItemWithPerks(item.hash)) {
       return;
     }
-    const added = getExtraIntrinsicPerkSockets(item)
-      .map((s) => s.plugged?.plugDef.hash)
-      .filter((h): h is number => h !== undefined);
+    const added = getExtraIntrinsicPerkHashes(item);
     if (added.length > 0) {
       lbDispatch({
         type: 'updatePerks',

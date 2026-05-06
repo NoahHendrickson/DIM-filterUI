@@ -11,7 +11,7 @@ import { ItemFilter } from 'app/search/filter-types';
 import { sumBy } from 'app/utils/collections';
 import { getModTypeTagByPlugCategoryHash, getSpecialtySocketMetadata } from 'app/utils/item-utils';
 import { warnLog } from 'app/utils/log';
-import { getExtraIntrinsicPerkSockets } from 'app/utils/socket-utils';
+import { getExtraIntrinsicPerkHashes } from 'app/utils/socket-utils';
 import { computeStatDupeLower } from 'app/utils/stats';
 import { BucketHashes } from 'data/d2/generated-enums';
 import { sum } from 'es-toolkit';
@@ -180,22 +180,12 @@ export function filterItems({
         // Build the set of all possible exotic class item perk hashes so we only
         // filter by perks that actually belong to these sockets, ignoring any
         // other perk hashes that may be in loadoutParams.perks (e.g. regular armor intrinsics).
-        const allClassPerkHashes = new Set(
-          exotics.flatMap((item) =>
-            getExtraIntrinsicPerkSockets(item)
-              .map((s) => s.plugged?.plugDef.hash)
-              .filter((h): h is number => h !== undefined),
-          ),
-        );
+        const allClassPerkHashes = new Set(exotics.flatMap(getExtraIntrinsicPerkHashes));
         const relevantPerks = perks.filter((p) => allClassPerkHashes.has(p));
         firstPassFilteredItems =
           relevantPerks.length > 0
             ? exotics.filter((item) => {
-                const equipped = new Set(
-                  getExtraIntrinsicPerkSockets(item)
-                    .map((s) => s.plugged?.plugDef.hash)
-                    .filter((h): h is number => h !== undefined),
-                );
+                const equipped = new Set(getExtraIntrinsicPerkHashes(item));
                 return relevantPerks.every((p) => equipped.has(p));
               })
             : exotics;
