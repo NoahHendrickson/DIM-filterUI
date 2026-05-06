@@ -1,6 +1,3 @@
-@use '../../variables' as *;
-@use 'sass:color';
-
 // TODO: really need a common version of this
 .infoCard {
   composes: flexRow from '../../dim-ui/common.m.scss';
@@ -22,10 +19,6 @@
   color: var(--theme-text);
   font-weight: bold;
   font-size: 14px;
-}
-
-.warning {
-  color: color.scale($red, $saturation: -30%);
 }
 
 .buttons {

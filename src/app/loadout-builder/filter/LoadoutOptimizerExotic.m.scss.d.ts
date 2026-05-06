@@ -7,7 +7,6 @@ interface CssExports {
   'selectedPerk': string;
   'selectedPerks': string;
   'title': string;
-  'warning': string;
 }
 export const cssExports: CssExports;
 export = cssExports;
