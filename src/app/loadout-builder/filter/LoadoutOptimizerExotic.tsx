@@ -70,9 +70,23 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
 
   const handleRandomize = () => {
     const exotics = findLockableExotics(allItems, vendorItems, classType, defs);
-    if (exotics.length > 0) {
-      const randomExotic = sample(exotics);
-      lbDispatch({ type: 'lockExotic', lockedExoticHash: randomExotic.def.hash });
+    if (exotics.length === 0) {
+      return;
+    }
+    const randomExotic = sample(exotics);
+    lbDispatch({ type: 'lockExotic', lockedExoticHash: randomExotic.def.hash });
+    if (randomExotic.def.itemSubType === DestinyItemSubType.ClassArmor) {
+      const ownedRolls = allItems.filter(
+        (i) => i.hash === randomExotic.def.hash && getExtraIntrinsicPerkSockets(i).length > 0,
+      );
+      if (ownedRolls.length > 0) {
+        const randomPerks = getExtraIntrinsicPerkSockets(sample(ownedRolls))
+          .map((s) => s.plugged?.plugDef.hash)
+          .filter((h): h is number => h !== undefined);
+        if (randomPerks.length > 0) {
+          lbDispatch({ type: 'updatePerks', removed: perks ?? [], added: randomPerks });
+        }
+      }
     }
   };
 
