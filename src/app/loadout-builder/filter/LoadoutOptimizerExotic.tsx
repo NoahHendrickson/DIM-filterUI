@@ -4,6 +4,7 @@ import { DimItem } from 'app/inventory/item-types';
 import { DefItemIcon } from 'app/inventory/ItemIcon';
 import { allItemsSelector, createItemContextSelector } from 'app/inventory/selectors';
 import { makeFakeItem } from 'app/inventory/store/d2-item-factory';
+import { getExoticClassItemPerkHashes } from 'app/inventory/store/exotic-class-item';
 import { isPluggableItem } from 'app/inventory/store/sockets';
 import { PlugDefTooltip } from 'app/item-popup/PlugTooltip';
 import LoadoutEditSection from 'app/loadout/loadout-edit/LoadoutEditSection';
@@ -63,7 +64,11 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
         .map((s) => s.plugged?.plugDef.hash)
         .filter((h): h is number => h !== undefined);
       if (equippedPerks.length > 0) {
-        lbDispatch({ type: 'updatePerks', removed: perks ?? [], added: equippedPerks });
+        lbDispatch({
+          type: 'updatePerks',
+          removed: getExoticClassItemPerkHashes(equippedExotic.hash),
+          added: equippedPerks,
+        });
       }
     }
   };
@@ -84,7 +89,11 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
           .map((s) => s.plugged?.plugDef.hash)
           .filter((h): h is number => h !== undefined);
         if (randomPerks.length > 0) {
-          lbDispatch({ type: 'updatePerks', removed: perks ?? [], added: randomPerks });
+          lbDispatch({
+            type: 'updatePerks',
+            removed: getExoticClassItemPerkHashes(randomExotic.def.hash),
+            added: randomPerks,
+          });
         }
       }
     }

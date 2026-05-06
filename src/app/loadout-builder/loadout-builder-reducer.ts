@@ -14,7 +14,7 @@ import { t } from 'app/i18next-t';
 import { DimItem, PluggableInventoryItemDefinition } from 'app/inventory/item-types';
 import { allItemsSelector } from 'app/inventory/selectors';
 import { DimStore } from 'app/inventory/store-types';
-import { exoticClassItemPlugs } from 'app/inventory/store/exotic-class-item';
+import { getExoticClassItemPerkHashes } from 'app/inventory/store/exotic-class-item';
 import { isPluggableItem } from 'app/inventory/store/sockets';
 import { getCurrentStore } from 'app/inventory/stores-helpers';
 import {
@@ -310,14 +310,6 @@ function lbUIReducer(state: LoadoutBuilderUI, action: LoadoutBuilderUIAction) {
   }
 }
 
-function exoticClassItemPerkHashes(exoticHash: number | undefined): number[] {
-  return exoticHash !== undefined
-    ? Object.values(exoticClassItemPlugs[exoticHash] ?? {})
-        .filter((p): p is number[] => p !== undefined)
-        .flat()
-    : [];
-}
-
 function lbConfigReducer(defs: D2ManifestDefinitions) {
   return (
     state: LoadoutBuilderConfiguration,
@@ -346,9 +338,8 @@ function lbConfigReducer(defs: D2ManifestDefinitions) {
         loadout = clearSubclass(defs)(loadout);
 
         // And the exotic — clear any locked exotic class item perks too
-        const previousExoticHash = loadout.parameters?.exoticArmorHash;
         loadout = setLoadoutPerks({
-          removed: exoticClassItemPerkHashes(previousExoticHash),
+          removed: getExoticClassItemPerkHashes(loadout.parameters?.exoticArmorHash),
         })(loadout);
         let loadoutParameters = {
           ...loadout.parameters,
@@ -539,7 +530,7 @@ function lbConfigReducer(defs: D2ManifestDefinitions) {
             return loadout;
           }
           const cleared = setLoadoutPerks({
-            removed: exoticClassItemPerkHashes(previousHash),
+            removed: getExoticClassItemPerkHashes(previousHash),
           })(loadout);
           return {
             ...cleared,
@@ -550,7 +541,7 @@ function lbConfigReducer(defs: D2ManifestDefinitions) {
       case 'removeLockedExotic':
         return updateLoadout(state, (loadout) => {
           const cleared = setLoadoutPerks({
-            removed: exoticClassItemPerkHashes(loadout.parameters?.exoticArmorHash),
+            removed: getExoticClassItemPerkHashes(loadout.parameters?.exoticArmorHash),
           })(loadout);
           return {
             ...cleared,

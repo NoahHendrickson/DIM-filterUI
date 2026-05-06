@@ -28,3 +28,16 @@ export const exoticClassItemPlugs: {
     ],
   },
 };
+
+/**
+ * All possible exotic intrinsic perk hashes for a given exotic class item, flattened across both
+ * intrinsic perk sockets. Used to scope perk-clearing operations to perks owned by the exotic
+ * class item picker, leaving any other intrinsic perks untouched.
+ */
+export function getExoticClassItemPerkHashes(exoticHash: number | undefined): number[] {
+  return exoticHash !== undefined
+    ? Object.values(exoticClassItemPlugs[exoticHash] ?? {})
+        .filter((p): p is number[] => p !== undefined)
+        .flat()
+    : [];
+}
