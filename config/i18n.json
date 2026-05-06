@@ -619,6 +619,7 @@
     "SelectModsCountActivityMods": "{{selected}}/{{maxSelectable}} Activity Mods",
     "ClassItemPerkLeftColumn": "Left Column",
     "ClassItemPerkRightColumn": "Right Column",
+    "SelectablePerks": "Selectable perks.",
     "SelectExotic": "Select exotic",
     "SelectPerks": "Select perks",
     "SelectMods": "Select Mods",

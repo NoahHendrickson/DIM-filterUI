@@ -66,7 +66,7 @@ export function exoticTileInfo(defs: D2ManifestDefinitions, exotic: LockedExotic
   const description = (
     <>
       {exotic.isArmor1 && <div>{t('LB.IncompatibleWithOptimizer')}</div>}
-      {(isExoticClassItemWithPerks(exotic.def.hash) && <div>{t('LB.SelectPerks')}</div>) ||
+      {(isExoticClassItemWithPerks(exotic.def.hash) && <div>{t('LB.SelectablePerks')}</div>) ||
         (exoticPerk && perkShortDescription)}
       {exoticMods?.map((mod) => (
         <div key={mod.hash} className={styles.perkOrModNameAndImage}>

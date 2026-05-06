@@ -237,9 +237,6 @@ function ChosenExoticOption({
           exoticMods,
           isArmor1: Boolean(fakeItem?.energy),
         });
-        if (isExoticClassItemWithPerks(fakeItem.hash)) {
-          info.description = undefined;
-        }
         break;
       }
       break;
