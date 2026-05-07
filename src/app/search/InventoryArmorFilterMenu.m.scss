@@ -2,61 +2,83 @@
 
 .menu {
   z-index: 100;
-  /* Fixed width so content (e.g. filtered set-bonus chips) does not shrink or grow the panel */
-  width: min(400px, 92vw);
-  min-width: min(400px, 92vw);
-  max-width: min(400px, 92vw);
+  width: min(220px, 92vw);
+  min-width: min(220px, 92vw);
+  max-width: min(220px, 92vw);
   overflow: visible;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  padding: 6px 0;
+  padding: 4px 0;
   background: var(--theme-armor-filter-menu-bg, var(--theme-search-dropdown-bg));
   border: 1px solid var(--theme-armor-filter-menu-border, var(--theme-search-dropdown-border));
   border-radius: $theme-corner-radius-search;
   box-shadow: var(--theme-armor-filter-menu-shadow);
 }
 
-.section {
-  flex: 0 0 auto;
-  border-bottom: 1px solid
-    var(--theme-armor-filter-menu-border, var(--theme-search-dropdown-border));
-
-  &:last-child {
-    border-bottom: none;
-  }
-}
-
-.sectionHeader {
+.categoryRow {
+  composes: resetButton from '../dim-ui/common.m.scss';
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 12px 6px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--theme-text);
+  text-align: left;
+
+  @include interactive($hover: true) {
+    background: color-mix(in srgb, var(--theme-accent-primary) 12%, transparent);
+    color: var(--theme-text);
+  }
 }
 
-.sectionHeader .sectionTitle {
-  padding: 0;
+.categoryRowOpen {
+  background: color-mix(in srgb, var(--theme-accent-primary) 8%, transparent);
+}
+
+.categoryLabel {
   flex: 1;
   min-width: 0;
 }
 
-.sectionTitle {
-  padding: 10px 12px 6px;
+.categoryChevron {
+  flex: 0 0 auto;
   font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--theme-text-secondary);
+  opacity: 0.7;
 }
 
-.sectionSearch {
-  flex: 0 0 112px;
-  width: 112px;
-  min-width: 112px;
-  max-width: 112px;
+.flyout {
+  z-index: 101;
+  box-sizing: border-box;
+  min-width: min(280px, 92vw);
+  max-width: min(320px, 92vw);
+  max-height: min(70vh, 420px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--theme-armor-filter-menu-bg, var(--theme-search-dropdown-bg));
+  border: 1px solid var(--theme-armor-filter-menu-border, var(--theme-search-dropdown-border));
+  border-radius: $theme-corner-radius-search;
+  box-shadow: var(--theme-armor-filter-menu-shadow);
+}
+
+.flyoutHeader {
+  flex: 0 0 auto;
+  padding: 8px 10px 4px;
+  border-bottom: 1px solid
+    var(--theme-armor-filter-menu-border, var(--theme-search-dropdown-border));
+}
+
+.flyoutSearch {
+  width: 100%;
+  box-sizing: border-box;
   font-size: 11px;
-  line-height: 1.2;
-  padding: 3px 6px;
+  line-height: 1.25;
+  padding: 5px 8px;
   border-radius: 3px;
   border: 1px solid var(--theme-search-dropdown-border);
   background: var(--theme-search-dropdown-bg);
@@ -72,30 +94,28 @@
   }
 }
 
-.sectionBodyEmpty {
-  padding: 2px 12px 12px;
+.flyoutBody {
+  flex: 1 1 auto;
+  overflow: hidden auto;
+  padding: 4px 0 6px;
+}
+
+.flyoutEmpty {
+  padding: 8px 12px 10px;
   font-size: 11px;
   color: var(--theme-text-secondary);
 }
 
-.sectionBody {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px 12px 12px;
-}
-
-.chip {
+.optionRow {
   composes: resetButton from '../dim-ui/common.m.scss';
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 12px;
   font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 3px;
-  background: var(--theme-armor-filter-chip-bg);
+  line-height: 1.3;
   color: var(--theme-text);
   text-align: left;
-  max-width: 100%;
-  outline: 1px solid transparent;
-  outline-offset: 1px;
 
   @include interactive($hover: true) {
     background: var(--theme-accent-primary);
@@ -103,9 +123,9 @@
   }
 }
 
-.chipActive {
-  background: color-mix(in srgb, var(--theme-accent-primary) 8%, transparent);
-  outline-color: var(--theme-accent-primary);
+.optionRowActive {
+  background: color-mix(in srgb, var(--theme-accent-primary) 10%, transparent);
+  box-shadow: inset 2px 0 0 var(--theme-accent-primary);
 }
 
 .menuButton {
