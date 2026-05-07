@@ -5,13 +5,14 @@ import { useD2Definitions } from 'app/manifest/selectors';
 import {
   applyArmorKvFilter,
   armorKvFilterIsActive,
+  armorKvKeywordSelectionCount,
   type ArmorKvFilterKeyword,
 } from 'app/search/armor-filter-query';
 import { realD2ArmorStatHashByName } from 'app/search/d2-known-values';
 import { armorArchetypeFilterNames } from 'app/search/items/search-filters/armor-archetype';
 import { getArmorSetBonusFilterOptions } from 'app/search/items/search-filters/setbonus';
 import { setSearchQuery } from 'app/shell/actions';
-import { AppIcon, faAngleRight, faFilter } from 'app/shell/icons';
+import { AppIcon, faAngleRight, faFilter, searchIcon } from 'app/shell/icons';
 import { querySelector } from 'app/shell/selectors';
 import { useThunkDispatch } from 'app/store/thunk-dispatch';
 import { compareBy } from 'app/utils/comparators';
@@ -33,6 +34,7 @@ const BRANCH_ORDER: ArmorKvFilterKeyword[] = ['setbonus', 'archetype', 'tunedsta
 
 const FLYOUT_OPEN_DELAY_MS = 120;
 const FLYOUT_CLOSE_GRACE_MS = 220;
+const FLYOUT_OVERLAP_PRIMARY_MENU_PX = 2;
 
 function formatArchetypeLabel(name: string) {
   return name.slice(0, 1).toUpperCase() + name.slice(1);
@@ -112,6 +114,16 @@ export default function InventoryArmorFilterMenu() {
     [],
   );
 
+  const categorySelectionCounts = useMemo(() => {
+    const counts: Record<ArmorKvFilterKeyword, number> = {
+      setbonus: armorKvKeywordSelectionCount(query, 'setbonus'),
+      archetype: armorKvKeywordSelectionCount(query, 'archetype'),
+      tunedstat: armorKvKeywordSelectionCount(query, 'tunedstat'),
+      tertiarystat: armorKvKeywordSelectionCount(query, 'tertiarystat'),
+    };
+    return counts;
+  }, [query]);
+
   useLayoutEffect(() => {
     flyoutAnchorRef.current = activeBranch ? (categoryRowRefs.current[activeBranch] ?? null) : null;
   }, [activeBranch, open]);
@@ -133,7 +145,7 @@ export default function InventoryArmorFilterMenu() {
       reference: flyoutAnchorRef,
       placement: 'right-start',
       fixed: true,
-      offset: 6,
+      offset: -FLYOUT_OVERLAP_PRIMARY_MENU_PX,
     },
     [open, activeBranch],
   );
@@ -307,14 +319,17 @@ export default function InventoryArmorFilterMenu() {
         return (
           <>
             <div className={styles.flyoutHeader}>
-              <input
-                type="search"
-                className={styles.flyoutSearch}
-                value={setBonusSearch}
-                onChange={(e) => setSetBonusSearch(e.target.value)}
-                placeholder={t('Header.ArmorFilterSetBonusSearchPlaceholder')}
-                aria-label={t('Header.ArmorFilterSetBonusSearchLabel')}
-              />
+              <div className={styles.flyoutSearchRow} role="search">
+                <AppIcon icon={searchIcon} className={styles.flyoutSearchIcon} ariaHidden />
+                <input
+                  type="search"
+                  className={styles.flyoutSearch}
+                  value={setBonusSearch}
+                  onChange={(e) => setSetBonusSearch(e.target.value)}
+                  placeholder={t('Header.ArmorFilterSetBonusSearchPlaceholder')}
+                  aria-label={t('Header.ArmorFilterSetBonusSearchLabel')}
+                />
+              </div>
             </div>
             <div className={styles.flyoutBody}>
               {filteredSetBonuses.map(({ slug, label }) => (
@@ -465,7 +480,14 @@ export default function InventoryArmorFilterMenu() {
               }}
             >
               <span className={styles.categoryLabel}>{branchTitle(branch)}</span>
-              <AppIcon icon={faAngleRight} className={styles.categoryChevron} />
+              <span className={styles.categoryRowEnd}>
+                {categorySelectionCounts[branch] > 0 && (
+                  <span className={styles.categoryFilterCount}>
+                    {categorySelectionCounts[branch]}
+                  </span>
+                )}
+                <AppIcon icon={faAngleRight} className={styles.categoryChevron} />
+              </span>
             </button>
           ))}
         </div>

@@ -2,9 +2,9 @@
 
 .menu {
   z-index: 100;
-  width: min(220px, 92vw);
-  min-width: min(220px, 92vw);
-  max-width: min(220px, 92vw);
+  width: min(196px, 92vw);
+  min-width: min(196px, 92vw);
+  max-width: min(196px, 92vw);
   overflow: visible;
   box-sizing: border-box;
   display: flex;
@@ -45,6 +45,21 @@
   min-width: 0;
 }
 
+.categoryRowEnd {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.categoryFilterCount {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--theme-accent-primary);
+}
+
 .categoryChevron {
   flex: 0 0 auto;
   font-size: 10px;
@@ -54,8 +69,8 @@
 .flyout {
   z-index: 101;
   box-sizing: border-box;
-  min-width: min(280px, 92vw);
-  max-width: min(320px, 92vw);
+  min-width: min(196px, 92vw);
+  max-width: min(236px, 92vw);
   max-height: min(70vh, 420px);
   display: flex;
   flex-direction: column;
@@ -68,29 +83,55 @@
 
 .flyoutHeader {
   flex: 0 0 auto;
-  padding: 8px 10px 4px;
+  padding: 6px 10px 4px;
   border-bottom: 1px solid
     var(--theme-armor-filter-menu-border, var(--theme-search-dropdown-border));
+
+  /* :focus-within would flash when focus jumps into the search after branch swap; match :focus-visible only. */
+  &:has(.flyoutSearch:focus-visible) {
+    border-bottom-color: var(--theme-accent-primary);
+  }
+}
+
+.flyoutSearchRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.flyoutSearchIcon {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--theme-text-secondary);
+  opacity: 0.85;
 }
 
 .flyoutSearch {
+  flex: 1 1 auto;
+  min-width: 0;
   width: 100%;
   box-sizing: border-box;
+  margin: 0;
+  appearance: none;
+  font-family: inherit;
   font-size: 11px;
   line-height: 1.25;
-  padding: 5px 8px;
-  border-radius: 3px;
-  border: 1px solid var(--theme-search-dropdown-border);
-  background: var(--theme-search-dropdown-bg);
+  padding: 6px 2px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
   color: var(--theme-text);
 
   &::placeholder {
     color: var(--theme-text-secondary);
   }
 
-  &:focus {
-    outline: 2px solid var(--theme-accent-primary);
-    outline-offset: 0;
+  &:focus,
+  &:focus-visible {
+    outline: none;
   }
 }
 

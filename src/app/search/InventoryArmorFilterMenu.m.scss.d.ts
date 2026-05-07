@@ -2,14 +2,18 @@
 // Please do not change this file!
 interface CssExports {
   'categoryChevron': string;
+  'categoryFilterCount': string;
   'categoryLabel': string;
   'categoryRow': string;
+  'categoryRowEnd': string;
   'categoryRowOpen': string;
   'flyout': string;
   'flyoutBody': string;
   'flyoutEmpty': string;
   'flyoutHeader': string;
   'flyoutSearch': string;
+  'flyoutSearchIcon': string;
+  'flyoutSearchRow': string;
   'menu': string;
   'menuButton': string;
   'optionRow': string;
