@@ -7,6 +7,9 @@ interface CssExports {
   'menuButton': string;
   'section': string;
   'sectionBody': string;
+  'sectionBodyEmpty': string;
+  'sectionHeader': string;
+  'sectionSearch': string;
   'sectionTitle': string;
 }
 export const cssExports: CssExports;

@@ -2,10 +2,12 @@
 
 .menu {
   z-index: 100;
-  /* Enough width that archetype chips usually stay on one row; min() keeps narrow viewports wrapping */
+  /* Fixed width so content (e.g. filtered set-bonus chips) does not shrink or grow the panel */
+  width: min(400px, 92vw);
   min-width: min(400px, 92vw);
-  max-width: min(420px, 92vw);
+  max-width: min(400px, 92vw);
   overflow: visible;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   padding: 6px 0;
@@ -25,11 +27,54 @@
   }
 }
 
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px 6px;
+}
+
+.sectionHeader .sectionTitle {
+  padding: 0;
+  flex: 1;
+  min-width: 0;
+}
+
 .sectionTitle {
   padding: 10px 12px 6px;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  color: var(--theme-text-secondary);
+}
+
+.sectionSearch {
+  flex: 0 0 112px;
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+  font-size: 11px;
+  line-height: 1.2;
+  padding: 3px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--theme-search-dropdown-border);
+  background: var(--theme-search-dropdown-bg);
+  color: var(--theme-text);
+
+  &::placeholder {
+    color: var(--theme-text-secondary);
+  }
+
+  &:focus {
+    outline: 2px solid var(--theme-accent-primary);
+    outline-offset: 0;
+  }
+}
+
+.sectionBodyEmpty {
+  padding: 2px 12px 12px;
+  font-size: 11px;
   color: var(--theme-text-secondary);
 }
 

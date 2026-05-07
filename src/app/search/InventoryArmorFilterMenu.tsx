@@ -44,10 +44,21 @@ export default function InventoryArmorFilterMenu() {
   const dispatch = useThunkDispatch();
   const query = useSelector(querySelector);
   const [open, setOpen] = useState(false);
+  const [setBonusSearch, setSetBonusSearch] = useState('');
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const setBonuses = useMemo(() => (defs ? getArmorSetBonusFilterOptions(defs) : []), [defs]);
+
+  const filteredSetBonuses = useMemo(() => {
+    const q = setBonusSearch.trim().toLowerCase();
+    if (!q) {
+      return setBonuses;
+    }
+    return setBonuses.filter(
+      (o) => o.label.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q),
+    );
+  }, [setBonuses, setBonusSearch]);
 
   const tuningKeys = useMemo(
     () =>
@@ -84,12 +95,24 @@ export default function InventoryArmorFilterMenu() {
 
   useEffect(() => {
     if (!open) {
+      setSetBonusSearch('');
       return undefined;
     }
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setOpen(false);
+      if (e.key !== 'Escape') {
+        return;
       }
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.matches('input[type="search"]') &&
+        menuRef.current?.contains(target) &&
+        (target as HTMLInputElement).value
+      ) {
+        e.preventDefault();
+        setSetBonusSearch('');
+        return;
+      }
+      setOpen(false);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
@@ -122,9 +145,19 @@ export default function InventoryArmorFilterMenu() {
       {open && (
         <div ref={menuRef} className={styles.menu} role="menu">
           <div className={styles.section}>
-            <div className={styles.sectionTitle}>{t('Header.ArmorFilterSectionSetBonus')}</div>
+            <div className={styles.sectionHeader}>
+              <div className={styles.sectionTitle}>{t('Header.ArmorFilterSectionSetBonus')}</div>
+              <input
+                type="search"
+                className={styles.sectionSearch}
+                value={setBonusSearch}
+                onChange={(e) => setSetBonusSearch(e.target.value)}
+                placeholder={t('Header.ArmorFilterSetBonusSearchPlaceholder')}
+                aria-label={t('Header.ArmorFilterSetBonusSearchLabel')}
+              />
+            </div>
             <div className={styles.sectionBody}>
-              {setBonuses.map(({ slug, label }) => (
+              {filteredSetBonuses.map(({ slug, label }) => (
                 <button
                   key={slug}
                   type="button"
@@ -137,6 +170,11 @@ export default function InventoryArmorFilterMenu() {
                 </button>
               ))}
             </div>
+            {filteredSetBonuses.length === 0 && setBonusSearch.trim() !== '' && (
+              <div className={styles.sectionBodyEmpty}>
+                {t('Header.ArmorFilterSetBonusNoMatches')}
+              </div>
+            )}
           </div>
           <div className={styles.section}>
             <div className={styles.sectionTitle}>{t('Header.ArmorFilterSectionArchetype')}</div>
