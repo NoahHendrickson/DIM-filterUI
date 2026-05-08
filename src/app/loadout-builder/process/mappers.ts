@@ -85,17 +85,10 @@ export function mapDimItemToProcessItems({
 
   const assumeArtifice = isAssumedArtifice(dimItem, armorEnergyRules);
 
-  const intrinsicPerkHashes: number[] = [];
-  const mainIntrinsicPerk = getIntrinsicArmorPerkSocket(dimItem)?.plugged?.plugDef.hash;
-  if (mainIntrinsicPerk !== undefined) {
-    intrinsicPerkHashes.push(mainIntrinsicPerk);
-  }
-  for (const s of getExtraIntrinsicPerkSockets(dimItem)) {
-    const h = s.plugged?.plugDef.hash;
-    if (h !== undefined) {
-      intrinsicPerkHashes.push(h);
-    }
-  }
+  const intrinsicPerkHashes = filterMap(
+    [getIntrinsicArmorPerkSocket(dimItem), ...getExtraIntrinsicPerkSockets(dimItem)],
+    (s) => s?.plugged?.plugDef.hash,
+  );
   const intrinsicPerks = intrinsicPerkHashes.length > 0 ? intrinsicPerkHashes : undefined;
 
   const processItem: ProcessItem = {

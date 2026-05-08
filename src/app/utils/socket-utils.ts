@@ -191,9 +191,7 @@ export function getExtraIntrinsicPerkSockets(item: DimItem): DimSocket[] {
  * item perks). Convenience wrapper around {@link getExtraIntrinsicPerkSockets}.
  */
 export function getExtraIntrinsicPerkHashes(item: DimItem): number[] {
-  return getExtraIntrinsicPerkSockets(item)
-    .map((s) => s.plugged?.plugDef.hash)
-    .filter((h): h is number => h !== undefined);
+  return filterMap(getExtraIntrinsicPerkSockets(item), (s) => s.plugged?.plugDef.hash);
 }
 
 export function socketContainsPlugWithCategory(

@@ -12,6 +12,7 @@ import { isPluggableItem } from 'app/inventory/store/sockets';
 import { PlugDefTooltip } from 'app/item-popup/PlugTooltip';
 import LoadoutEditSection from 'app/loadout/loadout-edit/LoadoutEditSection';
 import { useD2Definitions } from 'app/manifest/selectors';
+import { compareByIndex } from 'app/utils/comparators';
 import { getExtraIntrinsicPerkHashes, getExtraIntrinsicPerkSockets } from 'app/utils/socket-utils';
 import { DestinyClass } from 'bungie-api-ts/destiny2';
 import { sample } from 'es-toolkit';
@@ -109,7 +110,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
   const canonicalPerkOrder = getExoticClassItemPerkHashes(lockedExoticHash);
   const orderedPerks = (perks ?? [])
     .filter((p) => p !== 0 && canonicalPerkOrder.includes(p))
-    .toSorted((a, b) => canonicalPerkOrder.indexOf(a) - canonicalPerkOrder.indexOf(b));
+    .toSorted(compareByIndex(canonicalPerkOrder, (p) => p));
 
   return (
     <LoadoutEditSection

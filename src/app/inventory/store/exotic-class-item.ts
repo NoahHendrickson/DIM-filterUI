@@ -1,3 +1,4 @@
+import { compact } from 'app/utils/collections';
 import { emptyArray } from 'app/utils/empty';
 
 // Exotic class items' exotic intrinsic sockets don't correspond to plug sets.
@@ -38,9 +39,7 @@ export const exoticClassItemPlugs: {
  */
 export function getExoticClassItemPerkHashes(exoticHash: number | undefined): number[] {
   return exoticHash !== undefined
-    ? Object.values(exoticClassItemPlugs[exoticHash] ?? {})
-        .filter((p): p is number[] => p !== undefined)
-        .flat()
+    ? compact(Object.values(exoticClassItemPlugs[exoticHash] ?? {})).flat()
     : emptyArray();
 }
 
