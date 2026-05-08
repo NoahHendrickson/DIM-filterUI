@@ -2,55 +2,161 @@
 
 .menu {
   z-index: 100;
-  /* Enough width that archetype chips usually stay on one row; min() keeps narrow viewports wrapping */
-  min-width: min(400px, 92vw);
-  max-width: min(420px, 92vw);
+  width: min(196px, 92vw);
+  min-width: min(196px, 92vw);
+  max-width: min(196px, 92vw);
   overflow: visible;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  padding: 6px 0;
+  padding: 4px 0;
   background: var(--theme-armor-filter-menu-bg, var(--theme-search-dropdown-bg));
   border: 1px solid var(--theme-armor-filter-menu-border, var(--theme-search-dropdown-border));
   border-radius: $theme-corner-radius-search;
   box-shadow: var(--theme-armor-filter-menu-shadow);
 }
 
-.section {
-  flex: 0 0 auto;
-  border-bottom: 1px solid
-    var(--theme-armor-filter-menu-border, var(--theme-search-dropdown-border));
+.categoryRow {
+  composes: resetButton from '../dim-ui/common.m.scss';
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--theme-text);
+  text-align: left;
 
-  &:last-child {
-    border-bottom: none;
+  @include interactive($hover: true) {
+    background: color-mix(in srgb, var(--theme-accent-primary) 12%, transparent);
+    color: var(--theme-text);
   }
 }
 
-.sectionTitle {
-  padding: 10px 12px 6px;
+.categoryRowOpen {
+  background: color-mix(in srgb, var(--theme-accent-primary) 8%, transparent);
+}
+
+.categoryLabel {
+  flex: 1;
+  min-width: 0;
+}
+
+.categoryRowEnd {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.categoryFilterCount {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--theme-accent-primary);
+}
+
+.categoryChevron {
+  flex: 0 0 auto;
   font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.flyout {
+  z-index: 101;
+  box-sizing: border-box;
+  min-width: min(196px, 92vw);
+  max-width: min(236px, 92vw);
+  max-height: min(70vh, 420px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--theme-armor-filter-menu-bg, var(--theme-search-dropdown-bg));
+  border: 1px solid var(--theme-armor-filter-menu-border, var(--theme-search-dropdown-border));
+  border-radius: $theme-corner-radius-search;
+  box-shadow: var(--theme-armor-filter-menu-shadow);
+}
+
+.flyoutHeader {
+  flex: 0 0 auto;
+  padding: 6px 10px 4px;
+  border-bottom: 1px solid
+    var(--theme-armor-filter-menu-border, var(--theme-search-dropdown-border));
+
+  /* :focus-within would flash when focus jumps into the search after branch swap; match :focus-visible only. */
+  &:has(.flyoutSearch:focus-visible) {
+    border-bottom-color: var(--theme-accent-primary);
+  }
+}
+
+.flyoutSearchRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.flyoutSearchIcon {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--theme-text-secondary);
+  opacity: 0.85;
+}
+
+.flyoutSearch {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  appearance: none;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.25;
+  padding: 6px 2px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--theme-text);
+
+  &::placeholder {
+    color: var(--theme-text-secondary);
+  }
+
+  &:focus,
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+.flyoutBody {
+  flex: 1 1 auto;
+  overflow: hidden auto;
+  padding: 4px 0 6px;
+}
+
+.flyoutEmpty {
+  padding: 8px 12px 10px;
+  font-size: 11px;
   color: var(--theme-text-secondary);
 }
 
-.sectionBody {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px 12px 12px;
-}
-
-.chip {
+.optionRow {
   composes: resetButton from '../dim-ui/common.m.scss';
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 12px;
   font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 3px;
-  background: var(--theme-armor-filter-chip-bg);
+  line-height: 1.3;
   color: var(--theme-text);
   text-align: left;
-  max-width: 100%;
-  outline: 1px solid transparent;
-  outline-offset: 1px;
 
   @include interactive($hover: true) {
     background: var(--theme-accent-primary);
@@ -58,9 +164,9 @@
   }
 }
 
-.chipActive {
-  background: color-mix(in srgb, var(--theme-accent-primary) 8%, transparent);
-  outline-color: var(--theme-accent-primary);
+.optionRowActive {
+  background: color-mix(in srgb, var(--theme-accent-primary) 10%, transparent);
+  box-shadow: inset 2px 0 0 var(--theme-accent-primary);
 }
 
 .menuButton {

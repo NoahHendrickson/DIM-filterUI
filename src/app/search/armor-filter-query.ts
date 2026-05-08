@@ -48,6 +48,11 @@ function collectArmorKvKeywordValues(query: string, keyword: ArmorKvFilterKeywor
   return values;
 }
 
+/** Unique `keyword:value` tokens for `keyword:` in `query`, after deduping by value (case-insensitive). */
+export function armorKvKeywordSelectionCount(query: string, keyword: ArmorKvFilterKeyword): number {
+  return collectArmorKvKeywordValues(query, keyword).length;
+}
+
 /** Drop contiguous `keyword:*` OR-chains and any stray same-keyword tokens outside those chains. */
 function stripArmorKvKeywordTokens(query: string, keyword: ArmorKvFilterKeyword): string {
   const k = escapeKeywordForRegexp(keyword);

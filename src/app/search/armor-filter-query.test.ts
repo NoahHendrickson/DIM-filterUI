@@ -1,6 +1,7 @@
 import {
   applyArmorKvFilter,
   armorKvFilterIsActive,
+  armorKvKeywordSelectionCount,
   type ArmorKvFilterKeyword,
 } from './armor-filter-query';
 
@@ -30,6 +31,26 @@ describe('armorKvFilterIsActive', () => {
 
   it('does not confuse keywords', () => {
     expect(armorKvFilterIsActive('tertiarystat:class', 'tunedstat', 'class')).toBe(false);
+  });
+});
+
+describe('armorKvKeywordSelectionCount', () => {
+  it('counts single token', () => {
+    expect(armorKvKeywordSelectionCount('archetype:void', 'archetype')).toBe(1);
+  });
+
+  it('counts distinct values inside an OR chain', () => {
+    expect(
+      armorKvKeywordSelectionCount('setbonus:ferropotent or setbonus:smokejumper', 'setbonus'),
+    ).toBe(2);
+  });
+
+  it('dedupes same value case-insensitively', () => {
+    expect(armorKvKeywordSelectionCount('setbonus:x setbonus:X', 'setbonus')).toBe(1);
+  });
+
+  it('ignores other keywords', () => {
+    expect(armorKvKeywordSelectionCount('tertiarystat:class tunedstat:class', 'tunedstat')).toBe(1);
   });
 });
 

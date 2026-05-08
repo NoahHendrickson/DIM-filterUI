@@ -69,6 +69,13 @@
   // See InventoryArmorFilterMenu.m.scss: use var(--theme-armor-filter-*, var(--theme-search-*))
   // so borders/background follow each theme’s search tokens (not :root’s computed snapshot).
   --theme-armor-filter-chip-bg: rgb(128, 128, 128, 0.15);
+  // Tint with app gradient so the panel sits closer to the Beyond Light / default backdrop.
+  // (Gradient *end* is too close to #161616 to see a mix; *start* carries the visible blue-violet.)
+  --theme-armor-filter-menu-bg: color-mix(
+    in srgb,
+    var(--theme-app-bg-gradient-start) 34%,
+    var(--theme-fill-modal-actions)
+  );
   --theme-armor-filter-menu-shadow: 0 2px 8px rgb(0, 0, 0, 0.35);
 
   // Items
