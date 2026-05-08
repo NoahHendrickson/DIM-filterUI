@@ -696,7 +696,9 @@
       "MaybeDecreaseLowerBounds": "Consider reducing minimum stat requirements",
       "AllowAutoStatMods": "Allow DIM to automatically include additional stat mods",
       "SetBonuses": "You have chosen some set bonuses, maybe you don't have the right items to use them.",
-      "RemoveSetBonuses": "Consider removing some set bonuses"
+      "RemoveSetBonuses": "Consider removing some set bonuses",
+      "Perks": "DIM could not build any sets containing all of the selected armor perks.",
+      "MaybeRemovePerks": "Consider removing some armor perks"
     },
     "NoExotic": "No Exotic",
     "NoExoticDescription": "Equivalent to searching \"not:exotic\" in the search bar - sets will not use any exotic armor.",
