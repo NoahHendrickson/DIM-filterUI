@@ -202,28 +202,39 @@ export async function process(
   }
 
   let comboCount = 0;
+  // required perks' hashes
+  const perkHashes = requiredPerks.map((p) => p.hash);
+  // count of each perk on this item, in an array w/ same order as perkHashes
+  const perkCount = (item: ProcessItem) =>
+    perkHashes.map((hash) => Number(item.intrinsicPerks?.includes(hash)));
+
   itemLoop: for (let helmIdx = 0; helmIdx < helms.length; helmIdx++) {
     const helm = helms[helmIdx];
     const helmExotic = Number(helm.isExotic);
     const helmArtifice = Number(helm.isArtifice);
+    const helmPerks = perkCount(helm);
     const helmStats = statsCache.get(helm)!;
     for (let gauntIdx = 0; gauntIdx < gauntlets.length; gauntIdx++) {
       const gaunt = gauntlets[gauntIdx];
       const gauntletExotic = Number(gaunt.isExotic);
       const gauntArtifice = Number(gaunt.isArtifice);
+      const gauntPerks = perkCount(gaunt);
       const gauntStats = statsCache.get(gaunt)!;
       for (let chestIdx = 0; chestIdx < chests.length; chestIdx++) {
         const chest = chests[chestIdx];
         const chestExotic = Number(chest.isExotic);
         const chestArtifice = Number(chest.isArtifice);
+        const chestPerks = perkCount(chest);
         const chestStats = statsCache.get(chest)!;
         for (let legIdx = 0; legIdx < legs.length; legIdx++) {
           const leg = legs[legIdx];
           const legExotic = Number(leg.isExotic);
           const legArtifice = Number(leg.isArtifice);
+          const legPerks = perkCount(leg);
           const legStats = statsCache.get(leg)!;
           innerloop: for (let classItemIdx = 0; classItemIdx < classItems.length; classItemIdx++) {
             const classItem = classItems[classItemIdx];
+            const classItemPerks = perkCount(classItem);
             comboCount++;
             if (comboCount >= 100000) {
               onProgress(comboCount);
@@ -250,14 +261,10 @@ export async function process(
             }
 
             // Check required perk counts across the set
-            for (const { hash, count } of requiredPerks) {
+            for (let i = 0; i < requiredPerks.length; i++) {
               const actualCount =
-                Number(helm.intrinsicPerks?.includes(hash)) +
-                Number(gaunt.intrinsicPerks?.includes(hash)) +
-                Number(chest.intrinsicPerks?.includes(hash)) +
-                Number(leg.intrinsicPerks?.includes(hash)) +
-                Number(classItem.intrinsicPerks?.includes(hash));
-              if (actualCount < count) {
+                helmPerks[i] + gauntPerks[i] + chestPerks[i] + legPerks[i] + classItemPerks[i];
+              if (actualCount < requiredPerks[i].count) {
                 setStatistics.skipReasons.insufficientPerks++;
                 continue innerloop;
               }

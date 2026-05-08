@@ -1,3 +1,5 @@
+import { emptyArray } from 'app/utils/empty';
+
 // Exotic class items' exotic intrinsic sockets don't correspond to plug sets.
 // Thus we have to maintain manual lists of what can roll for each.
 export const exoticClassItemPlugs: {
@@ -39,7 +41,7 @@ export function getExoticClassItemPerkHashes(exoticHash: number | undefined): nu
     ? Object.values(exoticClassItemPlugs[exoticHash] ?? {})
         .filter((p): p is number[] => p !== undefined)
         .flat()
-    : [];
+    : emptyArray();
 }
 
 /**

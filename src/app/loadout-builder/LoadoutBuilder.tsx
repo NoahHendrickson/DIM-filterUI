@@ -32,7 +32,7 @@ import { useSetSetting } from 'app/settings/hooks';
 import { AppIcon, disabledIcon, redoIcon, refreshIcon, undoIcon } from 'app/shell/icons';
 import { querySelector, useIsPhonePortrait } from 'app/shell/selectors';
 import { filterMap } from 'app/utils/collections';
-import { emptyObject } from 'app/utils/empty';
+import { emptyArray, emptyObject } from 'app/utils/empty';
 import { isClassCompatible, itemCanBeEquippedBy } from 'app/utils/item-utils';
 import { errorLog } from 'app/utils/log';
 import { getMaxParallelCores } from 'app/utils/parallel-cores';
@@ -278,7 +278,7 @@ export default memo(function LoadoutBuilder({
     selectedStore,
     filteredItems,
     setBonuses,
-    perks: loadoutParameters.perks ?? [],
+    perks: loadoutParameters.perks ?? emptyArray(),
     lockedModMap,
     modStatChanges,
     armorEnergyRules,
