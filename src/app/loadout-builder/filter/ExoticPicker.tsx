@@ -346,8 +346,9 @@ export function ExoticPerkPicker({
                 key={perkDef.hash}
                 selected={selectedPerk1 === perkDef.hash}
                 disabled={
-                  !column1Pairs.has(perkDef.hash) ||
-                  (selectedPerk2 !== 0 && !column2Pairs.get(selectedPerk2)?.has(perkDef.hash))
+                  selectedPerk1 !== perkDef.hash &&
+                  (!column1Pairs.has(perkDef.hash) ||
+                    (selectedPerk2 !== 0 && !column2Pairs.get(selectedPerk2)?.has(perkDef.hash)))
                 }
                 title={perkDef.displayProperties.name}
                 icon={<DefItemIcon itemDef={perkDef} />}
@@ -365,8 +366,9 @@ export function ExoticPerkPicker({
                 key={perkDef.hash}
                 selected={selectedPerk2 === perkDef.hash}
                 disabled={
-                  !column2Pairs.has(perkDef.hash) ||
-                  (selectedPerk1 !== 0 && !column1Pairs.get(selectedPerk1)?.has(perkDef.hash))
+                  selectedPerk2 !== perkDef.hash &&
+                  (!column2Pairs.has(perkDef.hash) ||
+                    (selectedPerk1 !== 0 && !column1Pairs.get(selectedPerk1)?.has(perkDef.hash)))
                 }
                 title={perkDef.displayProperties.name}
                 icon={<DefItemIcon itemDef={perkDef} />}
