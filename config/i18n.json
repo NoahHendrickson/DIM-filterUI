@@ -755,6 +755,7 @@
     "ClassTypeMissing": "You do not have a {{className}} to create a loadout for",
     "ClearSection": "Remove all",
     "ClearLoadoutParameters": "Remove Loadout Optimizer settings",
+    "ClearPerks": "Remove perks",
     "ClearSpace": "Move others away",
     "ClearSpaceWeapons": "Move other weapons away",
     "ClearSpaceArmor": "Move other armor away",

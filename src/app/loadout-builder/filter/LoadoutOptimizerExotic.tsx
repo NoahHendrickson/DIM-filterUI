@@ -80,6 +80,12 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
     }
   };
 
+  const handleClearPerks = (selectedPerks: number[]) => {
+    if (selectedPerks.length) {
+      lbDispatch({ type: 'updatePerks', removed: selectedPerks, added: [] });
+    }
+  };
+
   const handleRandomize = () => {
     const exotics = findLockableExotics(allItems, vendorItems, classType, defs);
     if (exotics.length === 0) {
@@ -102,7 +108,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
   // Render selected perks in the same left-to-right order as the picker.
   const canonicalPerkOrder = getExoticClassItemPerkHashes(lockedExoticHash);
   const orderedPerks = (perks ?? [])
-    .filter((p) => p !== 0)
+    .filter((p) => p !== 0 && canonicalPerkOrder.includes(p))
     .toSorted((a, b) => canonicalPerkOrder.indexOf(a) - canonicalPerkOrder.indexOf(b));
 
   return (
@@ -112,6 +118,7 @@ const LoadoutOptimizerExotic = memo(function LoadoutOptimizerExotic({
       onClear={handleClear}
       onSyncFromEquipped={handleSyncFromEquipped}
       onRandomize={handleRandomize}
+      onClearPerks={showPerks ? () => handleClearPerks(orderedPerks) : undefined}
     >
       <ChosenExoticOption lockedExoticHash={lockedExoticHash} onClick={handleClickEdit} />
       {showPerks && orderedPerks.length > 0 && (

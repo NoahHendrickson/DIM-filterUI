@@ -806,6 +806,7 @@
     "ClassType_male": "{{className}} loadout",
     "Classified": "Some of your items are classified, and cannot be included in the max power calculation.",
     "ClearLoadoutParameters": "Remove Loadout Optimizer settings",
+    "ClearPerks": "Remove perks",
     "ClearSection": "Remove all",
     "ClearSpace": "Move others away",
     "ClearSpaceArmor": "Move other armor away",
