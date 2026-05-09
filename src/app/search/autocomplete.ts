@@ -363,6 +363,96 @@ function findFilter<I, FilterCtx, SuggestionsCtx>(
 }
 
 /**
+ * Describes the segment of the query the user is currently typing into and the set of
+ * candidate completions whose plainString'd form is a strict prefix of what they've typed.
+ *
+ * Used to drive in-line "ghost text" autocompletion plus Tab-to-cycle through values.
+ */
+export interface InlineCompletion {
+  /** The character index where the current segment starts in the query. */
+  segmentStart: number;
+  /** The character index where the current segment ends (the caret position). */
+  segmentEnd: number;
+  /** What the user typed in the current segment (raw text, casing preserved). */
+  typed: string;
+  /**
+   * Candidate full-segment replacement strings, ranked highest-confidence first.
+   * Each candidate's plainString'd form is guaranteed to be a strict prefix-extension
+   * of `typed` (case- and diacritic-insensitive).
+   */
+  candidates: string[];
+}
+
+/**
+ * Compute the inline completion suggestion for the current caret position.
+ *
+ * Returns `undefined` if the caret is in the middle of a segment, if the query is
+ * empty, or if no completions strictly start with what's been typed in the current
+ * segment.
+ *
+ * This is intentionally stricter than `autocompleteTermSuggestions` (which powers
+ * the dropdown panel): the dropdown is permissive ("contains" matching is fine
+ * because the user is browsing), whereas the inline ghost must be acceptable as a
+ * pure forward-completion of what's already on screen.
+ */
+export function inlineCompletion<I, FilterCtx, SuggestionsCtx>(
+  query: string,
+  caretIndex: number,
+  filterComplete: (term: string) => string[],
+  searchConfig: SearchConfig<I, FilterCtx, SuggestionsCtx>,
+): InlineCompletion | undefined {
+  if (!query) {
+    return undefined;
+  }
+
+  // Suppress when the caret is in the middle of a segment - the only legal
+  // characters between the caret and the end of the segment are whitespace
+  // or a closing paren.
+  if (caretIndex < query.length) {
+    const next = query[caretIndex];
+    if (next !== ' ' && next !== '\t' && next !== '\n' && next !== ')') {
+      return undefined;
+    }
+  }
+
+  const queryUpToCaret = query.slice(0, caretIndex);
+  const lastFilters = findLastFilter(queryUpToCaret);
+  if (!lastFilters || lastFilters.length === 0) {
+    return undefined;
+  }
+
+  for (const index of lastFilters) {
+    const term = queryUpToCaret.substring(index);
+    if (!term) {
+      continue;
+    }
+    const allCandidates = filterComplete(term);
+    if (allCandidates.length === 0) {
+      continue;
+    }
+    const typedPlain = plainString(term, searchConfig.language);
+    const prefixMatches: string[] = [];
+    for (const candidate of allCandidates) {
+      const candidatePlain = plainString(candidate, searchConfig.language);
+      // Strict prefix-extension: candidate must be longer than what's been typed,
+      // and start with it. This guarantees the ghost only ever appends characters.
+      if (candidatePlain.length > typedPlain.length && candidatePlain.startsWith(typedPlain)) {
+        prefixMatches.push(candidate);
+      }
+    }
+    if (prefixMatches.length > 0) {
+      return {
+        segmentStart: index,
+        segmentEnd: caretIndex,
+        typed: term,
+        candidates: prefixMatches,
+      };
+    }
+  }
+  return undefined;
+}
+
+/**
  * This builds a filter-complete function that uses the given search config's keywords to
  * offer autocomplete suggestions for a partially typed term.
  */

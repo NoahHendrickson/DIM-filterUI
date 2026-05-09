@@ -2,6 +2,7 @@ import { Search, SearchType } from '@destinyitemmanager/dim-api-types';
 import {
   autocompleteTermSuggestions,
   filterSortRecentSearches,
+  inlineCompletion,
   makeFilterComplete,
 } from './autocomplete';
 import { buildItemSearchConfig } from './items/item-search-filter';
@@ -223,6 +224,81 @@ describe('filterSortRecentSearches', () => {
   test.each(highlightCases)('check saved search highlighting for query |%s|', (query: string) => {
     const candidates = filterSortRecentSearches(query, savedSearches);
     expect(candidates).toMatchSnapshot();
+  });
+});
+
+describe('inlineCompletion', () => {
+  const searchConfig = buildItemSearchConfig(2, 'en');
+  const filterComplete = makeFilterComplete(searchConfig);
+
+  // Each test case: a query (with optional `|` for caret) plus the expected first
+  // ghost candidate string (or null if no inline completion should be offered).
+  const cases: [query: string, expectedFirstCandidate: string | null][] = [
+    // Typing the start of a keyword - the top candidate keyword:
+    ['is:b', 'is:bow'],
+    // Stats use a sub-keyword, so the top candidate keeps the trailing colon
+    ['stat:mob', 'stat:mobility:'],
+    // Caret in the middle of a segment - suppress
+    ['is:b|ow', null],
+    // Empty query - no inline completion
+    ['', null],
+    // Unknown term - no inline completion
+    ['xyzzy', null],
+    // After a complete filter and a space, before the next word starts -
+    // the cursor isn't actually inside an incomplete filter.
+    ['is:bow ', null],
+    // After a freeform value separator we get value candidates
+    ['stat:', 'stat:rpm:'],
+  ];
+
+  test.each(cases)('inline completion for {%s}', (queryWithCaret, expected) => {
+    const [caretIndex, query] = extractCaret(queryWithCaret);
+    const result = inlineCompletion(query, caretIndex, filterComplete, searchConfig);
+    if (expected === null) {
+      expect(result).toBeUndefined();
+    } else {
+      expect(result).toBeDefined();
+      expect(result!.candidates[0]).toBe(expected);
+    }
+  });
+
+  test('every candidate is a strict prefix-extension of the typed segment', () => {
+    const result = inlineCompletion('is:b', 4, filterComplete, searchConfig)!;
+    expect(result).toBeDefined();
+    for (const candidate of result.candidates) {
+      expect(candidate.length).toBeGreaterThan(result.typed.length);
+      expect(candidate.toLowerCase().startsWith(result.typed.toLowerCase())).toBe(true);
+    }
+  });
+
+  test('reports the correct segment range', () => {
+    const result = inlineCompletion('is:haspower is:b', 16, filterComplete, searchConfig)!;
+    expect(result).toBeDefined();
+    expect(result.segmentStart).toBe(12);
+    expect(result.segmentEnd).toBe(16);
+    expect(result.typed).toBe('is:b');
+  });
+
+  test('cycle list is non-empty for an empty value after a freeform colon', () => {
+    // Synthetic mock filterComplete - real one only returns values when the
+    // filter has explicit suggestions; this confirms the helper itself is fine.
+    const fc = (term: string) =>
+      term === 'tag:' ? ['tag:favorite', 'tag:keep', 'tag:junk', 'tag:infuse'] : [];
+    const result = inlineCompletion('tag:', 4, fc, searchConfig)!;
+    expect(result).toBeDefined();
+    expect(result.candidates).toHaveLength(4);
+    expect(result.typed).toBe('tag:');
+  });
+
+  test('mid-segment caret suppresses inline completion', () => {
+    const fc = () => ['is:bow'];
+    const result = inlineCompletion('is:b ow', 4, fc, searchConfig);
+    // Caret at position 4 - the next char is a space, so this is end-of-segment;
+    // confirm we DO get a result here.
+    expect(result).toBeDefined();
+    // But if the caret is BEFORE the space (still inside 'b'), nothing.
+    const result2 = inlineCompletion('isbow', 2, fc, searchConfig);
+    expect(result2).toBeUndefined();
   });
 });
 
