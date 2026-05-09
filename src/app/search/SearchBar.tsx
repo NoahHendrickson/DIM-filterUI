@@ -49,7 +49,12 @@ import {
 import HighlightedText from './HighlightedText';
 import * as styles from './SearchBar.m.scss';
 import { buildArmoryIndex } from './armory-search';
-import createAutocompleter, { SearchItem, SearchItemType, getGhostSuffix } from './autocomplete';
+import createAutocompleter, {
+  SearchItem,
+  SearchItemType,
+  getGhostSuffix,
+  makeFilterComplete,
+} from './autocomplete';
 import { searchConfigSelector, validateQuerySelector } from './items/item-search-filter';
 import {
   loadoutSearchConfigSelector,
@@ -84,6 +89,13 @@ const loadoutAutoCompleterSelector = createSelector(
   loadoutSearchConfigSelector,
   () => undefined,
   createAutocompleter,
+);
+
+const filterCompleteSelector = createSelector(searchConfigSelector, makeFilterComplete);
+
+const loadoutFilterCompleteSelector = createSelector(
+  loadoutSearchConfigSelector,
+  makeFilterComplete,
 );
 
 const LazyFilterHelp = lazy(() => import(/* webpackChunkName: "filter-help" */ './FilterHelp'));
@@ -236,6 +248,9 @@ function SearchBar({
   const autocompleter = useSelector(
     searchType === SearchType.Loadout ? loadoutAutoCompleterSelector : autoCompleterSelector,
   );
+  const filterComplete = useSelector(
+    searchType === SearchType.Loadout ? loadoutFilterCompleteSelector : filterCompleteSelector,
+  );
   const validateQuery = useSelector(
     searchType === SearchType.Loadout ? validateLoadoutQuerySelector : validateQuerySelector,
   );
@@ -323,13 +338,44 @@ function SearchBar({
       ? ghostCandidates[ghostCycleIndex % ghostCandidates.length]
       : undefined;
 
-  // We're at the "value stage" when the current term being completed already contains a colon
-  // (i.e., the user has selected a filter identifier and is now choosing a value). Shift+Tab
-  // cycling — and its inline hint — only apply here; at the keyword stage there's typically
-  // just one keyword extension to accept with Tab and nothing meaningful to cycle through.
-  const isAtValueStage =
-    activeGhost?.item.highlightRange !== undefined &&
-    liveQuery.slice(activeGhost.item.highlightRange.range[0]).includes(':');
+  // Find the start of the current term in the typed query (walk back to the last whitespace or
+  // open-paren). This is the position we keep stable when swapping in alternate values.
+  const termStart = useMemo(() => {
+    let start = 0;
+    for (let i = caretPosition - 1; i >= 0; i--) {
+      if (/[\s()]/.test(liveQuery[i])) {
+        start = i + 1;
+        break;
+      }
+    }
+    return start;
+  }, [liveQuery, caretPosition]);
+
+  // The current term's filter prefix (e.g. `tunedstat:`), or null if no colon has been typed yet.
+  // When non-null, the user has selected an identifier and we can offer value cycling.
+  const termPrefix = useMemo(() => {
+    const term = liveQuery.slice(termStart, caretPosition);
+    const lastColon = term.lastIndexOf(':');
+    if (lastColon === -1) {
+      return null;
+    }
+    return term.slice(0, lastColon + 1);
+  }, [liveQuery, termStart, caretPosition]);
+
+  const isAtValueStage = termPrefix !== null;
+
+  // All possible values for the current filter prefix. Stable across typing within the value, so
+  // cycling continues to make sense after the user has Tab-accepted a value.
+  const cycleValues = useMemo(
+    () => (termPrefix ? filterComplete(termPrefix) : []),
+    [filterComplete, termPrefix],
+  );
+
+  // If the user has typed an exact value (e.g. `tunedstat:weapon`), record its index so Shift+Tab
+  // can swap it in place to the next alternative.
+  const typedTerm = liveQuery.slice(termStart, caretPosition);
+  const exactValueIndex = cycleValues.indexOf(typedTerm);
+  const canSwapValue = isAtValueStage && exactValueIndex >= 0 && cycleValues.length > 1;
 
   // Reset cycle index whenever the typed query changes (typing, Tab acceptance, programmatic reset).
   // Shift+Tab cycling does not change liveQuery, so the index persists across cycles.
@@ -467,6 +513,18 @@ function SearchBar({
       // Cycle to the next inline ghost suggestion without changing the typed query.
       e.preventDefault();
       setGhostCycleIndex((i) => (i + 1) % ghostCandidates.length);
+    } else if (e.key === 'Tab' && e.shiftKey && !e.altKey && !e.ctrlKey && canSwapValue) {
+      // The user has typed (or accepted) an exact value. Swap it in place for the next value
+      // associated with the same filter — cycling continues to work after acceptance.
+      e.preventDefault();
+      const nextIdx = (exactValueIndex + 1) % cycleValues.length;
+      const nextValue = cycleValues[nextIdx];
+      const newQuery = liveQuery.slice(0, termStart) + nextValue;
+      if (inputElement.current) {
+        inputElement.current.setSelectionRange(0, inputElement.current.value.length);
+        document.execCommand('insertText', false, newQuery);
+        inputElement.current.setSelectionRange(newQuery.length, newQuery.length);
+      }
     } else if (
       e.key === 'Tab' &&
       !e.shiftKey &&
@@ -578,12 +636,16 @@ function SearchBar({
             })}
             enterKeyHint="search"
           />
-          {activeGhost && !isPhonePortrait && (
+          {(activeGhost || canSwapValue) && !isPhonePortrait && (
             <div className={styles.ghostOverlay} aria-hidden>
               <span className={styles.ghostMirror}>{liveQuery}</span>
-              <span className={styles.ghostText}>{activeGhost.suffix}</span>
-              <KeyHelp combo="tab" className={styles.ghostKey} />
-              {isAtValueStage && ghostCandidates.length > 1 && (
+              {activeGhost && (
+                <>
+                  <span className={styles.ghostText}>{activeGhost.suffix}</span>
+                  <KeyHelp combo="tab" className={styles.ghostKey} />
+                </>
+              )}
+              {((isAtValueStage && ghostCandidates.length > 1) || canSwapValue) && (
                 <>
                   <KeyHelp combo="shift+tab" className={styles.ghostKey} />
                   <span className={styles.ghostHint}>{t('Header.CycleSuggestion')}</span>
