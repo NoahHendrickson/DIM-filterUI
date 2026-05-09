@@ -45,6 +45,13 @@ interface BaseSearchItem {
     /** The indices of the first and last character that should be highlighted */
     range: [number, number];
   };
+  /**
+   * For {@link SearchItemType.Autocomplete}: replaces only the incomplete filter segment
+   * (not the whole search). The menu shows this instead of the full query.
+   */
+  completionWord?: string;
+  /** Matching incomplete term from the query when this suggestion was built */
+  incompleteTerm?: string;
 }
 
 export interface ArmorySearchItem extends BaseSearchItem {
@@ -434,6 +441,7 @@ export function autocompleteTermSuggestions<I, FilterCtx, SuggestionsCtx>(
       const helpText: string | undefined = filterDef
         ? filterDescriptionText(filterDef.description)
         : undefined;
+      const termLen = term.length;
       return {
         query: {
           fullText: newQuery,
@@ -441,10 +449,16 @@ export function autocompleteTermSuggestions<I, FilterCtx, SuggestionsCtx>(
           helpText: helpText?.replace(/\.$/, ''),
         },
         type: SearchItemType.Autocomplete,
-        highlightRange: {
-          section: 'body',
-          range: [index, index + word.length],
-        },
+        completionWord: word,
+        incompleteTerm: term,
+        ...(termLen < word.length
+          ? {
+              highlightRange: {
+                section: 'body' as const,
+                range: [termLen, word.length] as [number, number],
+              },
+            }
+          : {}),
       };
     });
     if (result.length) {
@@ -467,6 +481,43 @@ function findFilter<I, FilterCtx, SuggestionsCtx>(
 
 function collapseAlphaNum(s: string) {
   return s.replace(/[^a-z0-9]/gi, '');
+}
+
+/** Gray “whisper” suffix after the caret for inline completion hint (may be empty). */
+export function completionWhisperSuffix(incompleteTerm: string, completionWord: string): string {
+  if (!completionWord) {
+    return '';
+  }
+  const a = incompleteTerm.toLowerCase();
+  const b = completionWord.toLowerCase();
+  let i = 0;
+  while (i < incompleteTerm.length && i < completionWord.length && a[i] === b[i]) {
+    i++;
+  }
+  if (i === incompleteTerm.length && i <= completionWord.length) {
+    return completionWord.slice(i);
+  }
+
+  const ca = collapseAlphaNum(incompleteTerm);
+  const cb = collapseAlphaNum(completionWord);
+  if (ca.length > 0 && cb.startsWith(ca)) {
+    let matched = 0;
+    let ci = 0;
+    while (ci < completionWord.length && matched < ca.length) {
+      const ch = completionWord[ci];
+      if (/[a-z0-9]/i.test(ch)) {
+        if (ch.toLowerCase() !== ca[matched]) {
+          break;
+        }
+        matched++;
+      }
+      ci++;
+    }
+    if (matched === ca.length) {
+      return completionWord.slice(ci);
+    }
+  }
+  return '';
 }
 
 function suggestionMatchesLoose(

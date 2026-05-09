@@ -1,6 +1,7 @@
 import { Search, SearchType } from '@destinyitemmanager/dim-api-types';
 import {
   autocompleteTermSuggestions,
+  completionWhisperSuffix,
   filterSortRecentSearches,
   isValueTabCycleMode,
   makeFilterComplete,
@@ -63,7 +64,7 @@ describe('autocompleteTermSuggestions', () => {
         filterComplete,
         searchConfig,
       );
-      expect(candidates[0]?.query.body ?? 'Expected failure').toBe(expected);
+      expect(candidates[0]?.query.fullText ?? 'Expected failure').toBe(expected);
     },
   );
 
@@ -135,7 +136,7 @@ describe('autocompleteTermSuggestions', () => {
         filterCompleteMock,
         searchConfig,
       );
-      expect(candidates[0]?.query.body).toBe(expected);
+      expect(candidates[0]?.query.fullText).toBe(expected);
     },
   );
 });
@@ -225,6 +226,17 @@ describe('filterSortRecentSearches', () => {
   test.each(highlightCases)('check saved search highlighting for query |%s|', (query: string) => {
     const candidates = filterSortRecentSearches(query, savedSearches);
     expect(candidates).toMatchSnapshot();
+  });
+});
+
+describe('completionWhisperSuffix', () => {
+  test('prefix extension', () => {
+    expect(completionWhisperSuffix('set', 'setbonus:')).toBe('bonus:');
+    expect(completionWhisperSuffix('is:b', 'is:bow')).toBe('ow');
+  });
+
+  test('hyphen-typed initials', () => {
+    expect(completionWhisperSuffix('s-e-t', 'setbonus:')).toBe('bonus:');
   });
 });
 

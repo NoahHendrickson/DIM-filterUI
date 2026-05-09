@@ -1,5 +1,66 @@
 @use '../variables.scss' as *;
 
+.inputShell {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.inputShell input {
+  all: initial;
+  outline: none;
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  padding: 7px 0;
+  font-size: inherit;
+  font-family: inherit;
+  color: inherit;
+  caret-color: var(--theme-accent-primary);
+}
+
+.whisperBackdrop {
+  position: absolute;
+  inset: 0 0 0 0;
+  padding: 7px 0;
+  pointer-events: none;
+  white-space: pre;
+  overflow: hidden;
+  font-size: inherit;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  color: inherit;
+}
+
+.whisperMatch {
+  color: inherit;
+}
+
+.whisperHint {
+  color: var(--theme-text-secondary);
+  opacity: 0.55;
+}
+
+.searchInputGhosted {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+  color: transparent !important;
+}
+
+.searchInputGhosted::placeholder {
+  color: #999 !important;
+  opacity: 1;
+}
+
+.searchInputGhosted::selection {
+  background: rgb(128, 128, 128, 0.35);
+}
+
 .searchBar {
   position: relative;
   font-size: 13px;

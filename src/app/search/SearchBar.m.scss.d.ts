@@ -6,6 +6,7 @@ interface CssExports {
   'filterBarButton': string;
   'filterHelp': string;
   'highlightedItem': string;
+  'inputShell': string;
   'invalid': string;
   'keyHelp': string;
   'menu': string;
@@ -18,7 +19,11 @@ interface CssExports {
   'openInArmoryLabel': string;
   'saveSearchButton': string;
   'searchBar': string;
+  'searchInputGhosted': string;
   'textHighlight': string;
+  'whisperBackdrop': string;
+  'whisperHint': string;
+  'whisperMatch': string;
 }
 export const cssExports: CssExports;
 export = cssExports;

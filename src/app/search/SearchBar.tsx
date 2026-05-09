@@ -52,6 +52,7 @@ import { buildArmoryIndex } from './armory-search';
 import createAutocompleter, {
   SearchItem,
   SearchItemType,
+  completionWhisperSuffix,
   isValueTabCycleMode,
   makeFilterComplete,
   resolveTermForAutocomplete,
@@ -131,6 +132,33 @@ const RowContents = memo(({ item }: { item: SearchItem }) => {
         </>
       );
     default:
+      if (item.completionWord !== undefined) {
+        const label = item.completionWord;
+        const hr = item.highlightRange;
+        const bodyContent =
+          hr?.section === 'body' && hr.range[1] > hr.range[0] ? (
+            <HighlightedText
+              text={label}
+              startIndex={hr.range[0]}
+              endIndex={hr.range[1]}
+              className={styles.textHighlight}
+            />
+          ) : (
+            label
+          );
+        return (
+          <>
+            {item.query.header && highlight(item.query.header, 'header')}
+            <span
+              className={clsx({
+                [styles.namedQueryBody]: item.query.header !== undefined,
+              })}
+            >
+              {bodyContent}
+            </span>
+          </>
+        );
+      }
       return (
         <>
           {item.query.header && highlight(item.query.header, 'header')}
@@ -262,6 +290,8 @@ function SearchBar({
 
   const [liveQueryLive, setLiveQuery] = useState(searchQuery ?? '');
   const [caretIndex, setCaretIndex] = useState(() => (searchQuery ?? '').length);
+  const [inputFocused, setInputFocused] = useState(false);
+  const [hasTextSelection, setHasTextSelection] = useState(false);
   const valueCycleRef = useRef<{ key: string; nextIndex: number }>({ key: '', nextIndex: 0 });
   const [filterHelpOpen, setFilterHelpOpen] = useState(false);
   const [armoryItemHash, setArmoryItemHash] = useState<number | undefined>(undefined);
@@ -270,25 +300,15 @@ function SearchBar({
 
   const syncCaretFromInput = useCallback(() => {
     const el = inputElement.current;
-    if (el && el.selectionStart !== null) {
-      setCaretIndex(el.selectionStart);
-    }
-  }, []);
-
-  const applyAutocompleteItem = useCallback((item: SearchItem) => {
-    const input = inputElement.current;
-    if (!input) {
+    if (!el) {
       return;
     }
-    input.setSelectionRange(0, input.value.length);
-    document.execCommand('insertText', false, item.query.fullText);
-    if (item.highlightRange) {
-      const cursorPos = item.highlightRange.range[1];
-      input.setSelectionRange(cursorPos, cursorPos);
-      setCaretIndex(cursorPos);
-    } else {
-      setCaretIndex(item.query.fullText.length);
+    const { selectionStart: s, selectionEnd: e } = el;
+    if (s === null || e === null) {
+      return;
     }
+    setCaretIndex(s);
+    setHasTextSelection(s !== e);
   }, []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -306,7 +326,7 @@ function SearchBar({
   const { valid, saveable } = validateQuery(liveQuery);
 
   const lastBlurQuery = useRef<string>(undefined);
-  const onBlur = () => {
+  const onSearchBlur = () => {
     if (valid && liveQuery && liveQuery !== lastBlurQuery.current) {
       // save this to the recent searches only on blur
       // we use the ref to only fire if the query changed since the last blur
@@ -353,34 +373,21 @@ function SearchBar({
 
   const tabHintItem = filterTabTargets[0];
 
-  // useCombobox from Downshift manages the state of the dropdown
-  const {
-    isOpen,
-    getToggleButtonProps,
-    getMenuProps,
-    getInputProps,
-    getLabelProps,
-    highlightedIndex,
-    getItemProps,
-    setInputValue,
-    reset: clearFilter,
-  } = useCombobox<SearchItem>({
-    items,
-    stateReducer,
-    initialInputValue: liveQueryLive,
-    initialIsOpen: isPhonePortrait && mainSearchBar,
-    defaultHighlightedIndex: liveQueryLive ? 0 : -1,
-    itemToString: (i) => i?.query.fullText || '',
-    onInputValueChange: ({ inputValue, type }) => {
-      setLiveQuery(inputValue || '');
-      debouncedUpdateQuery(inputValue || '');
-      if (type === useCombobox.stateChangeTypes.FunctionReset) {
-        onClear?.();
-      }
-    },
-  });
+  const whisperSuffix = useMemo(() => {
+    const row = tabHintItem;
+    if (
+      !inputFocused ||
+      hasTextSelection ||
+      !row?.completionWord ||
+      row.incompleteTerm === undefined
+    ) {
+      return '';
+    }
+    return completionWhisperSuffix(row.incompleteTerm, row.completionWord);
+  }, [hasTextSelection, inputFocused, tabHintItem]);
 
-  // special click handling for filter helper
+  const useGhostMirror = inputFocused && liveQueryLive.length > 0;
+
   function stateReducer(
     state: UseComboboxState<SearchItem>,
     actionAndChanges: UseComboboxStateChangeOptions<SearchItem>,
@@ -414,6 +421,87 @@ function SearchBar({
         return changes; // no handling for other types
     }
   }
+
+  // useCombobox from Downshift manages the state of the dropdown
+  const {
+    isOpen,
+    getToggleButtonProps,
+    getMenuProps,
+    getInputProps,
+    getLabelProps,
+    highlightedIndex,
+    getItemProps,
+    setInputValue,
+    reset: clearFilter,
+  } = useCombobox<SearchItem>({
+    items,
+    stateReducer,
+    initialInputValue: liveQueryLive,
+    initialIsOpen: isPhonePortrait && mainSearchBar,
+    defaultHighlightedIndex: liveQueryLive ? 0 : -1,
+    itemToString: (i) => i?.query.fullText || '',
+    onInputValueChange: ({ inputValue, type }) => {
+      setLiveQuery(inputValue || '');
+      debouncedUpdateQuery(inputValue || '');
+      if (type === useCombobox.stateChangeTypes.FunctionReset) {
+        onClear?.();
+      }
+    },
+  });
+
+  const applyFilterCompletion = useCallback(
+    (item: SearchItem) => {
+      const input = inputElement.current;
+      if (
+        !input ||
+        item.type !== SearchItemType.Autocomplete ||
+        item.completionWord === undefined
+      ) {
+        return;
+      }
+      const info = resolveTermForAutocomplete(liveQueryLive, caretIndex, filterComplete);
+      if (!info) {
+        return;
+      }
+      const newValue = info.base + item.completionWord + liveQueryLive.slice(info.caretEnd);
+      input.setSelectionRange(0, input.value.length);
+      document.execCommand('insertText', false, newValue);
+      const cursorPos = info.base.length + item.completionWord.length;
+      input.setSelectionRange(cursorPos, cursorPos);
+      setCaretIndex(cursorPos);
+      setLiveQuery(newValue);
+      setInputValue(newValue);
+      debouncedUpdateQuery(newValue);
+    },
+    [caretIndex, debouncedUpdateQuery, filterComplete, liveQueryLive, setInputValue],
+  );
+
+  const applyAutocompleteItem = useCallback(
+    (item: SearchItem) => {
+      const input = inputElement.current;
+      if (!input) {
+        return;
+      }
+      if (item.completionWord !== undefined) {
+        applyFilterCompletion(item);
+        return;
+      }
+      input.setSelectionRange(0, input.value.length);
+      document.execCommand('insertText', false, item.query.fullText);
+      if (item.highlightRange) {
+        const cursorPos = item.highlightRange.range[1];
+        input.setSelectionRange(cursorPos, cursorPos);
+        setCaretIndex(cursorPos);
+      } else {
+        setCaretIndex(item.query.fullText.length);
+      }
+      const v = input.value;
+      setLiveQuery(v);
+      setInputValue(v);
+      debouncedUpdateQuery(v);
+    },
+    [applyFilterCompletion, debouncedUpdateQuery, setInputValue],
+  );
 
   // Reset live query when search version changes
   useEffect(() => {
@@ -580,27 +668,46 @@ function SearchBar({
         role="search"
       >
         <AppIcon {...getLabelProps({ icon: searchIcon, className: 'search-bar-icon' })} />
-        <input
-          {...getInputProps({
-            onBlur,
-            onClick: syncCaretFromInput,
-            onSelect: syncCaretFromInput,
-            onKeyUp: syncCaretFromInput,
-            onKeyDown,
-            ref: inputElement,
-            className: clsx({ [styles.invalid]: !valid }),
-            autoComplete: 'off',
-            autoCorrect: 'off',
-            autoCapitalize: 'off',
-            spellCheck: false,
-            autoFocus,
-            placeholder,
-            type: 'text',
-            name: 'filter',
-            'aria-label': placeholder,
-          })}
-          enterKeyHint="search"
-        />
+        <div className={styles.inputShell}>
+          {useGhostMirror && (
+            <div className={styles.whisperBackdrop} aria-hidden>
+              <span className={styles.whisperMatch}>{liveQueryLive.slice(0, caretIndex)}</span>
+              {whisperSuffix ? <span className={styles.whisperHint}>{whisperSuffix}</span> : null}
+              <span className={styles.whisperMatch}>{liveQueryLive.slice(caretIndex)}</span>
+            </div>
+          )}
+          <input
+            {...getInputProps({
+              onBlur: () => {
+                setInputFocused(false);
+                onSearchBlur();
+              },
+              onFocus: () => {
+                setInputFocused(true);
+              },
+              onClick: syncCaretFromInput,
+              onSelect: syncCaretFromInput,
+              onKeyUp: syncCaretFromInput,
+              onMouseUp: syncCaretFromInput,
+              onKeyDown,
+              ref: inputElement,
+              className: clsx({
+                [styles.invalid]: !valid,
+                [styles.searchInputGhosted]: useGhostMirror,
+              }),
+              autoComplete: 'off',
+              autoCorrect: 'off',
+              autoCapitalize: 'off',
+              spellCheck: false,
+              autoFocus,
+              placeholder,
+              type: 'text',
+              name: 'filter',
+              'aria-label': placeholder,
+            })}
+            enterKeyHint="search"
+          />
+        </div>
         <LayoutGroup>
           <AnimatePresence>
             {children}
