@@ -262,6 +262,43 @@ describe('inlineCompletion', () => {
     expect(result!.candidates.some((c) => c.startsWith('setbonus'))).toBe(true);
   });
 
+  test('cycleCandidates is populated for keyword:value segments with 2+ values', () => {
+    // is: filters have many values; we should get cycleCandidates back.
+    const result = inlineCompletion('is:', 3, filterComplete, language)!;
+    expect(result).toBeDefined();
+    expect(result.cycleCandidates).toBeDefined();
+    expect(result.cycleCandidates!.length).toBeGreaterThan(1);
+    // Every cycle candidate is a real `is:value`, not just the bare keyword.
+    for (const c of result.cycleCandidates!) {
+      expect(c.startsWith('is:')).toBe(true);
+      expect(c).not.toBe('is:');
+      expect(c.endsWith(':')).toBe(false);
+    }
+  });
+
+  test('cycleCandidates is populated even after typing a partial value', () => {
+    // After typing `is:b`, prefix matches narrow to bow, blue, etc.,
+    // but cycle candidates should still be the full `is:` value list so
+    // Shift+Tab can rotate to anything.
+    const result = inlineCompletion('is:b', 4, filterComplete, language)!;
+    expect(result).toBeDefined();
+    expect(result.candidates.length).toBeGreaterThan(0);
+    expect(result.cycleCandidates).toBeDefined();
+    expect(result.cycleCandidates!.length).toBeGreaterThan(result.candidates.length);
+  });
+
+  test('typed-only-keyword segment exposes empty candidates but cycleCandidates', () => {
+    // When the user has fully typed a complete value, ghost candidates may be
+    // empty, but cycle should still let them rotate.
+    const fc = (term: string) =>
+      term.startsWith('tag:') ? ['tag:favorite', 'tag:keep', 'tag:junk', 'tag:infuse'] : [];
+    const result = inlineCompletion('tag:favorite', 12, fc, language)!;
+    expect(result).toBeDefined();
+    // Already a complete value - no prefix-extension candidates.
+    expect(result.candidates).toHaveLength(0);
+    expect(result.cycleCandidates).toEqual(['tag:favorite', 'tag:keep', 'tag:junk', 'tag:infuse']);
+  });
+
   test.each(cases)('inline completion for {%s}', (queryWithCaret, expected) => {
     const [caretIndex, query] = extractCaret(queryWithCaret);
     const result = inlineCompletion(query, caretIndex, filterComplete, language);

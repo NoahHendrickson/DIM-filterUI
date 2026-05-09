@@ -364,10 +364,15 @@ function findFilter<I, FilterCtx, SuggestionsCtx>(
 }
 
 /**
- * Describes the segment of the query the user is currently typing into and the set of
- * candidate completions whose plainString'd form is a strict prefix of what they've typed.
+ * Describes the segment of the query the user is currently typing into and two
+ * sets of candidate completions:
  *
- * Used to drive in-line "ghost text" autocompletion plus Tab-to-cycle through values.
+ *  - `candidates` (powers Tab autofill / inline ghost text) - strict prefix
+ *    matches of what the user typed in the current segment.
+ *  - `cycleCandidates` (powers Shift+Tab value rotation) - the full set of
+ *    legal values for the segment's keyword, regardless of partial typing.
+ *    Only populated when the segment has the form `keyword:value` and the
+ *    keyword has 2+ legal values.
  */
 export interface InlineCompletion {
   /** The character index where the current segment starts in the query. */
@@ -379,9 +384,16 @@ export interface InlineCompletion {
   /**
    * Candidate full-segment replacement strings, ranked highest-confidence first.
    * Each candidate's plainString'd form is guaranteed to be a strict prefix-extension
-   * of `typed` (case- and diacritic-insensitive).
+   * of `typed` (case- and diacritic-insensitive). May be empty if the typed
+   * text is a complete value but cycling is still available.
    */
   candidates: string[];
+  /**
+   * The full list of `keyword:value` candidates for cycling via Shift+Tab.
+   * Only present when the segment has the form `keyword:` (or `keyword:value`)
+   * and there are 2+ values available for that keyword.
+   */
+  cycleCandidates?: string[];
 }
 
 /**
@@ -441,12 +453,33 @@ export function inlineCompletion(
         prefixMatches.push(candidate);
       }
     }
-    if (prefixMatches.length > 0) {
+
+    // Compute cycle candidates - the full value list for this segment's
+    // keyword. We feed `keyword:` (without the partial value) to filterComplete
+    // so we don't lose options the user hasn't typed a prefix for.
+    let cycleCandidates: string[] | undefined;
+    const colonIdx = term.indexOf(':');
+    if (colonIdx >= 0) {
+      const keywordPrefix = term.slice(0, colonIdx + 1);
+      const allValueCandidates = filterComplete(keywordPrefix);
+      // Keep only true values: longer than the keyword prefix and not just
+      // another sub-keyword form (which would end with `:`). This filters out
+      // things like the bare `setbonus:` and stat sub-keyword stems.
+      const valueCandidates = allValueCandidates.filter(
+        (c) => c.startsWith(keywordPrefix) && c.length > keywordPrefix.length && !c.endsWith(':'),
+      );
+      if (valueCandidates.length > 1) {
+        cycleCandidates = valueCandidates;
+      }
+    }
+
+    if (prefixMatches.length > 0 || cycleCandidates) {
       return {
         segmentStart: index,
         segmentEnd: caretIndex,
         typed: term,
         candidates: prefixMatches,
+        cycleCandidates,
       };
     }
   }

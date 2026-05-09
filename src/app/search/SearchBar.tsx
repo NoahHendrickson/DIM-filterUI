@@ -407,21 +407,12 @@ function SearchBar({
     [liveQuery, caretPosition, filterComplete, language],
   );
 
-  // Active Tab cycle. Set by the Tab handler when we accept the first candidate
-  // for a segment, advanced on subsequent Tab presses, cleared on any other
-  // input change.
-  interface CycleState {
-    segmentStart: number;
-    candidates: string[];
-    index: number;
-    materializedLength: number;
-  }
-  const cycleStateRef = useRef<CycleState | null>(null);
-  // Mirror cycle state in React state so we can re-render the keyboard help
-  // (count, shift+tab affordance) when it changes.
-  const [activeCycle, setActiveCycle] = useState<CycleState | null>(null);
-  // Set immediately before our Tab handler synthesizes an `insertText` so that
-  // the resulting onInputValueChange knows to keep the active cycle.
+  // We don't keep cycle state across renders any more - Shift+Tab always
+  // looks at the live segment value and advances to the next candidate from
+  // the (memoised) cycleCandidates list. This avoids subtle staleness bugs
+  // where the cycle state lagged behind input edits.
+  // We still need a one-shot "this onInputValueChange came from us, don't
+  // surprise the user" guard so other future side-effects don't fire.
   const tabAdvancingRef = useRef(false);
 
   // useCombobox from Downshift manages the state of the dropdown
@@ -448,15 +439,7 @@ function SearchBar({
       if (type === useCombobox.stateChangeTypes.FunctionReset) {
         onClear?.();
       }
-      // Any input change that wasn't initiated by our own Tab handler ends the
-      // cycle. The Tab handler sets `tabAdvancingRef` for exactly one
-      // onInputValueChange to bypass this.
-      if (tabAdvancingRef.current) {
-        tabAdvancingRef.current = false;
-      } else if (cycleStateRef.current) {
-        cycleStateRef.current = null;
-        setActiveCycle(null);
-      }
+      tabAdvancingRef.current = false;
     },
   });
 
@@ -567,8 +550,7 @@ function SearchBar({
   );
 
   // What the dropdown should advertise as the current "Tab target" so the
-  // little Tab key-help on the matching row tells the truth. The actual Tab
-  // priority lives in `onKeyDown` below; this is its rendered shadow.
+  // little Tab key-help on the matching dropdown row tells the truth.
   const userHighlightedRow =
     highlightedIndex > 0 && items[highlightedIndex]?.type === SearchItemType.Autocomplete
       ? items[highlightedIndex]
@@ -580,11 +562,20 @@ function SearchBar({
   // Mirrors onKeyDown's priority: user-highlighted row > inline ghost > fallback.
   const tabAutocompleteItem = userHighlightedRow ?? (inlineActive ? undefined : dropdownFallback);
 
-  // True if we have *something* the Tab key can do (advance the cycle, accept
-  // the inline ghost, or accept a dropdown autocomplete row).
-  const hasTabAction = Boolean(
-    cycleStateRef.current ?? userHighlightedRow ?? inlineActive ?? dropdownFallback,
+  // The current segment value (used to find our position in cycleCandidates).
+  const currentSegment = inline ? liveQuery.slice(inline.segmentStart, inline.segmentEnd) : '';
+  const cycleCandidates = inline?.cycleCandidates;
+  const cycleIndex =
+    cycleCandidates && cycleCandidates.length > 0 ? cycleCandidates.indexOf(currentSegment) : -1;
+
+  // Tab autofills the inline ghost (or dropdown row) - hidden if there's
+  // nothing left to autofill on this segment.
+  const tabAvailable = Boolean(
+    userHighlightedRow ?? inlineActive ?? (tabAutocompleteItem && isOpen),
   );
+  // Shift+Tab cycles values for the current `keyword:value` segment - shown
+  // whenever there are 2+ candidate values, regardless of typed prefix.
+  const shiftTabAvailable = Boolean(cycleCandidates && cycleCandidates.length > 1);
 
   /**
    * Replace the current segment in the input with `candidate`, leaving the caret
@@ -612,51 +603,29 @@ function SearchBar({
       // Don't interfere with IME composition.
       !e.nativeEvent.isComposing
     ) {
-      const direction = e.shiftKey ? -1 : 1;
-      const cycle = cycleStateRef.current;
       const input = inputElement.current;
 
-      // If we're already in an active cycle and the input still ends with our
-      // last materialised candidate, rotate to the next one.
-      if (cycle && input) {
-        const expected = cycle.candidates[cycle.index];
-        const actual = input.value.slice(
-          cycle.segmentStart,
-          cycle.segmentStart + cycle.materializedLength,
-        );
-        if (
-          actual === expected &&
-          input.selectionStart === input.selectionEnd &&
-          input.selectionStart === cycle.segmentStart + cycle.materializedLength
-        ) {
+      // Shift+Tab = cycle through value candidates for the current segment.
+      // Always rotates forward through inline.cycleCandidates; the user can
+      // keep tapping Shift+Tab to walk the list.
+      if (e.shiftKey) {
+        if (cycleCandidates && cycleCandidates.length > 1 && inline) {
           e.preventDefault();
-          const nextIndex =
-            (cycle.index + direction + cycle.candidates.length) % cycle.candidates.length;
-          const nextCandidate = cycle.candidates[nextIndex];
-          replaceSegment(
-            cycle.segmentStart,
-            cycle.segmentStart + cycle.materializedLength,
-            nextCandidate,
-          );
-          const nextCycle: CycleState = {
-            ...cycle,
-            index: nextIndex,
-            materializedLength: nextCandidate.length,
-          };
-          cycleStateRef.current = nextCycle;
-          setActiveCycle(nextCycle);
+          // -1 (typed prefix doesn't match a candidate) becomes 0 on first cycle;
+          // otherwise step forward and wrap.
+          const nextIdx = cycleIndex < 0 ? 0 : (cycleIndex + 1) % cycleCandidates.length;
+          replaceSegment(inline.segmentStart, inline.segmentEnd, cycleCandidates[nextIdx]);
           return;
         }
-        // Cycle is stale (user moved cursor or edited around it).
-        cycleStateRef.current = null;
-        setActiveCycle(null);
+        // Nothing to cycle, fall through to default Shift+Tab (focus change).
+        return;
       }
 
-      // No cycle in progress. Priority of acceptance:
+      // Tab (no shift) = autofill the inline ghost / dropdown selection.
+      // Priority of acceptance:
       //   1. The user has explicitly arrowed onto an autocomplete row in the
       //      dropdown - respect that choice.
       //   2. Inline ghost - strict prefix completion of the current segment.
-      //      This is the new behaviour and powers value cycling.
       //   3. Dropdown's first autocomplete row - loose "contains" fallback,
       //      preserving the original Tab UX for things like `jun -> tag:junk`.
       const userHighlightedDropdown =
@@ -680,25 +649,7 @@ function SearchBar({
 
       if (inline && inline.candidates.length > 0) {
         e.preventDefault();
-        const startIndex = direction > 0 ? 0 : inline.candidates.length - 1;
-        const first = inline.candidates[startIndex];
-        replaceSegment(inline.segmentStart, inline.segmentEnd, first);
-        // If the accepted candidate ends with `:` (a keyword waiting for a
-        // value), don't start a cycle - the next Tab will recompute fresh
-        // candidates against the new typed prefix and produce the value list.
-        if (first.endsWith(':')) {
-          cycleStateRef.current = null;
-          setActiveCycle(null);
-        } else {
-          const newCycle: CycleState = {
-            segmentStart: inline.segmentStart,
-            candidates: inline.candidates,
-            index: startIndex,
-            materializedLength: first.length,
-          };
-          cycleStateRef.current = newCycle;
-          setActiveCycle(newCycle);
-        }
+        replaceSegment(inline.segmentStart, inline.segmentEnd, inline.candidates[0]);
         return;
       }
 
@@ -715,7 +666,7 @@ function SearchBar({
         }
         return;
       }
-      // Fall through: nothing to complete, default Tab behaviour (focus change).
+      // Fall through: nothing to autofill, default Tab behaviour (focus change).
     } else if (e.key === 'Home' || e.key === 'End') {
       // Disable the use of Home/End to select items in the menu
       // https://github.com/downshift-js/downshift/issues/1162
@@ -818,15 +769,17 @@ function SearchBar({
             visible={ghostVisible}
             onAccept={isPhonePortrait ? acceptGhost : undefined}
             tabAffordance={
-              !isPhonePortrait && hasTabAction ? (
+              !isPhonePortrait && (tabAvailable || shiftTabAvailable) ? (
                 <>
-                  <KeyHelp combo="tab" />
-                  {activeCycle && activeCycle.candidates.length > 1 && (
+                  {tabAvailable && <KeyHelp combo="tab" />}
+                  {shiftTabAvailable && (
                     <>
                       <KeyHelp combo="shift+tab" />
-                      <span className={styles.ghostCycleCount}>
-                        {activeCycle.index + 1}/{activeCycle.candidates.length}
-                      </span>
+                      {cycleCandidates && cycleIndex >= 0 && (
+                        <span className={styles.ghostCycleCount}>
+                          {cycleIndex + 1}/{cycleCandidates.length}
+                        </span>
+                      )}
                     </>
                   )}
                 </>
