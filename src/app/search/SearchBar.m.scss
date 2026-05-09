@@ -105,16 +105,19 @@
   cursor: pointer;
 }
 
-.ghostKeyHelp {
-  margin: 0 6px;
+// Inline Tab key affordance rendered inside the ghost overlay so it sits
+// directly to the right of the rightmost character (typed text or ghost
+// suffix). The parent layer is `color: transparent` to hide the shadow span,
+// so we re-enable visible color and a small left margin here.
+.ghostKeyHelpInline {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  margin-left: 8px;
   color: var(--theme-text-secondary);
-  opacity: 0.7;
+  font-size: 11px;
+  vertical-align: middle;
   white-space: nowrap;
-  pointer-events: none;
 }
 
 .ghostCycleCount {

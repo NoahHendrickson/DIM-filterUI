@@ -7,7 +7,7 @@ interface CssExports {
   'filterBarButton': string;
   'filterHelp': string;
   'ghostCycleCount': string;
-  'ghostKeyHelp': string;
+  'ghostKeyHelpInline': string;
   'ghostLayer': string;
   'ghostSuffix': string;
   'highlightedItem': string;

@@ -201,6 +201,7 @@ const GhostOverlay = memo(function GhostOverlay({
   ghostText,
   visible,
   onAccept,
+  tabAffordance,
 }: {
   inputRef: React.RefObject<HTMLInputElement | null>;
   query: string;
@@ -208,6 +209,10 @@ const GhostOverlay = memo(function GhostOverlay({
   ghostText: string;
   visible: boolean;
   onAccept?: () => void;
+  /** Optional element rendered inline immediately after the ghost suffix
+   *  (or after the typed text when there is no suffix). Used to anchor the
+   *  Tab key-help marker right next to the rightmost character in the input. */
+  tabAffordance?: React.ReactNode;
 }) {
   const layerRef = useRef<HTMLDivElement>(null);
 
@@ -225,9 +230,14 @@ const GhostOverlay = memo(function GhostOverlay({
     onScroll();
     input.addEventListener('scroll', onScroll, { passive: true });
     return () => input.removeEventListener('scroll', onScroll);
-  }, [inputRef, query, caretIndex, ghostText, visible]);
+  }, [inputRef, query, caretIndex, ghostText, visible, tabAffordance]);
 
-  if (!visible || !ghostText) {
+  // Render the layer whenever there is anything to overlay - either a ghost
+  // suffix or an inline Tab affordance. The shadow span of `before` paints the
+  // typed text transparently to push subsequent siblings to the caret's exact
+  // x-position.
+  const showSuffix = visible && Boolean(ghostText);
+  if (!showSuffix && !tabAffordance) {
     return null;
   }
   const before = query.slice(0, caretIndex);
@@ -235,19 +245,22 @@ const GhostOverlay = memo(function GhostOverlay({
   return (
     <div ref={layerRef} className={styles.ghostLayer} aria-hidden="true">
       <span>{before}</span>
-      <span
-        className={styles.ghostSuffix}
-        onMouseDown={
-          onAccept
-            ? (e) => {
-                e.preventDefault();
-                onAccept();
-              }
-            : undefined
-        }
-      >
-        {ghostText}
-      </span>
+      {showSuffix && (
+        <span
+          className={styles.ghostSuffix}
+          onMouseDown={
+            onAccept
+              ? (e) => {
+                  e.preventDefault();
+                  onAccept();
+                }
+              : undefined
+          }
+        >
+          {ghostText}
+        </span>
+      )}
+      {tabAffordance ? <span className={styles.ghostKeyHelpInline}>{tabAffordance}</span> : null}
       {after && <span>{after}</span>}
     </div>
   );
@@ -804,6 +817,21 @@ function SearchBar({
             ghostText={ghostText}
             visible={ghostVisible}
             onAccept={isPhonePortrait ? acceptGhost : undefined}
+            tabAffordance={
+              !isPhonePortrait && hasTabAction ? (
+                <>
+                  <KeyHelp combo="tab" />
+                  {activeCycle && activeCycle.candidates.length > 1 && (
+                    <>
+                      <KeyHelp combo="shift+tab" />
+                      <span className={styles.ghostCycleCount}>
+                        {activeCycle.index + 1}/{activeCycle.candidates.length}
+                      </span>
+                    </>
+                  )}
+                </>
+              ) : null
+            }
           />
           <span aria-live="polite" className={styles.ariaLive}>
             {ghostVisible && ghostFullCandidate
@@ -811,19 +839,6 @@ function SearchBar({
               : ''}
           </span>
         </div>
-        {!isPhonePortrait && hasTabAction && (
-          <span className={styles.ghostKeyHelp} aria-hidden="true">
-            <KeyHelp combo="tab" />
-            {activeCycle && activeCycle.candidates.length > 1 && (
-              <>
-                <KeyHelp combo="shift+tab" />
-                <span className={styles.ghostCycleCount}>
-                  {activeCycle.index + 1}/{activeCycle.candidates.length}
-                </span>
-              </>
-            )}
-          </span>
-        )}
         <LayoutGroup>
           <AnimatePresence>
             {children}
