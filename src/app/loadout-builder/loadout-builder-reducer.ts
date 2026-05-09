@@ -565,7 +565,11 @@ function lbConfigReducer(defs: D2ManifestDefinitions) {
           }
           // Replace any currently-selected perk in the same column.
           const columnPerks = getExoticClassItemPerkColumn(exoticHash, perkHash);
-          const removed = columnPerks ? currentPerks.filter((p) => columnPerks.includes(p)) : [];
+          if (columnPerks === undefined) {
+            // Refuse to set anything if something's gone wrong
+            return loadout;
+          }
+          const removed = currentPerks.filter((p) => columnPerks.includes(p));
           return setLoadoutPerks({ removed, added: [perkHash] })(loadout);
         });
       }

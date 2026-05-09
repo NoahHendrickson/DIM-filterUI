@@ -206,7 +206,7 @@ export async function process(
   const perkHashes = requiredPerks.map((p) => p.hash);
   // count of each perk on this item, in an array w/ same order as perkHashes
   const perkCount = (item: ProcessItem) =>
-    perkHashes.map((hash) => Number(item.intrinsicPerks?.includes(hash)));
+    perkHashes.map((hash) => (item.intrinsicPerks?.includes(hash) ? 1 : 0));
 
   itemLoop: for (let helmIdx = 0; helmIdx < helms.length; helmIdx++) {
     const helm = helms[helmIdx];
@@ -234,7 +234,6 @@ export async function process(
           const legStats = statsCache.get(leg)!;
           innerloop: for (let classItemIdx = 0; classItemIdx < classItems.length; classItemIdx++) {
             const classItem = classItems[classItemIdx];
-            const classItemPerks = perkCount(classItem);
             comboCount++;
             if (comboCount >= 100000) {
               onProgress(comboCount);
@@ -261,6 +260,7 @@ export async function process(
             }
 
             // Check required perk counts across the set
+            const classItemPerks = perkCount(classItem);
             for (let i = 0; i < requiredPerks.length; i++) {
               const actualCount =
                 helmPerks[i] + gauntPerks[i] + chestPerks[i] + legPerks[i] + classItemPerks[i];
