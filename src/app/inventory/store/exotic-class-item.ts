@@ -38,9 +38,8 @@ export const exoticClassItemPlugs: {
  * class item picker, leaving any other intrinsic perks untouched.
  */
 export function getExoticClassItemPerkHashes(exoticHash: number | undefined): number[] {
-  return exoticHash !== undefined
-    ? compact(Object.values(exoticClassItemPlugs[exoticHash] ?? {})).flat()
-    : emptyArray();
+  const plugs = exoticHash !== undefined && exoticClassItemPlugs[exoticHash];
+  return plugs ? compact(Object.values(plugs)).flat() : emptyArray();
 }
 
 /**
