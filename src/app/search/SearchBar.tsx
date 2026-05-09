@@ -553,19 +553,24 @@ function SearchBar({
     [clearFilter],
   );
 
-  // The dropdown still highlights one row as the "Tab target" for keyboard help;
-  // when the user highlights an autocomplete row in the dropdown, prefer that
-  // over the inline ghost. Otherwise fall back to the inline completion's first
-  // candidate (so keyboard help is shown even before the user opens the menu).
-  const tabAutocompleteItem =
+  // What the dropdown should advertise as the current "Tab target" so the
+  // little Tab key-help on the matching row tells the truth. The actual Tab
+  // priority lives in `onKeyDown` below; this is its rendered shadow.
+  const userHighlightedRow =
     highlightedIndex > 0 && items[highlightedIndex]?.type === SearchItemType.Autocomplete
       ? items[highlightedIndex]
       : undefined;
+  const inlineActive = Boolean(inline && inline.candidates.length > 0);
+  const dropdownFallback = items.find(
+    (s) => s.type === SearchItemType.Autocomplete && s.query.fullText !== liveQuery,
+  );
+  // Mirrors onKeyDown's priority: user-highlighted row > inline ghost > fallback.
+  const tabAutocompleteItem = userHighlightedRow ?? (inlineActive ? undefined : dropdownFallback);
 
   // True if we have *something* the Tab key can do (advance the cycle, accept
-  // the dropdown highlight, or accept the inline ghost).
+  // the inline ghost, or accept a dropdown autocomplete row).
   const hasTabAction = Boolean(
-    cycleStateRef.current ?? tabAutocompleteItem ?? (inline && inline.candidates.length > 0),
+    cycleStateRef.current ?? userHighlightedRow ?? inlineActive ?? dropdownFallback,
   );
 
   /**
@@ -634,17 +639,26 @@ function SearchBar({
         setActiveCycle(null);
       }
 
-      // No cycle in progress: try to start one. We prefer the dropdown's
-      // highlighted autocomplete item (Shift+Tab through the dropdown is a
-      // legitimate user gesture), otherwise fall back to the inline ghost.
-      if (tabAutocompleteItem && isOpen) {
+      // No cycle in progress. Priority of acceptance:
+      //   1. The user has explicitly arrowed onto an autocomplete row in the
+      //      dropdown - respect that choice.
+      //   2. Inline ghost - strict prefix completion of the current segment.
+      //      This is the new behaviour and powers value cycling.
+      //   3. Dropdown's first autocomplete row - loose "contains" fallback,
+      //      preserving the original Tab UX for things like `jun -> tag:junk`.
+      const userHighlightedDropdown =
+        highlightedIndex > 0 && items[highlightedIndex]?.type === SearchItemType.Autocomplete
+          ? items[highlightedIndex]
+          : undefined;
+
+      if (userHighlightedDropdown && isOpen) {
         e.preventDefault();
         if (input) {
           input.setSelectionRange(0, input.value.length);
           tabAdvancingRef.current = true;
-          document.execCommand('insertText', false, tabAutocompleteItem.query.fullText);
-          if (tabAutocompleteItem.highlightRange) {
-            const cursorPos = tabAutocompleteItem.highlightRange.range[1];
+          document.execCommand('insertText', false, userHighlightedDropdown.query.fullText);
+          if (userHighlightedDropdown.highlightRange) {
+            const cursorPos = userHighlightedDropdown.highlightRange.range[1];
             input.setSelectionRange(cursorPos, cursorPos);
           }
         }
@@ -671,6 +685,20 @@ function SearchBar({
           };
           cycleStateRef.current = newCycle;
           setActiveCycle(newCycle);
+        }
+        return;
+      }
+
+      if (tabAutocompleteItem && isOpen) {
+        e.preventDefault();
+        if (input) {
+          input.setSelectionRange(0, input.value.length);
+          tabAdvancingRef.current = true;
+          document.execCommand('insertText', false, tabAutocompleteItem.query.fullText);
+          if (tabAutocompleteItem.highlightRange) {
+            const cursorPos = tabAutocompleteItem.highlightRange.range[1];
+            input.setSelectionRange(cursorPos, cursorPos);
+          }
         }
         return;
       }
