@@ -7,10 +7,18 @@
 
 // When the dropdown is open we just square off the bottom corners of the
 // search bar so it visually merges with the menu below. No extra border /
-// shadow on the input itself.
+// shadow on the input itself - including on hover, which would otherwise
+// fire while the user mouses over menu rows (because the menu is a
+// descendant of `.search-filter`).
 .open {
   border-bottom-left-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
+  box-shadow: none !important;
+
+  &:hover,
+  &:focus-within {
+    box-shadow: none !important;
+  }
 }
 
 .menu {
