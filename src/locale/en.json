@@ -414,6 +414,7 @@
     "FilterMatchCount_one": "1 item",
     "FilterMatchCount_other": "{{count}} items",
     "Filters": "Filters",
+    "GhostSuggestion": "Suggestion: {{suggestion}}, press Tab to accept",
     "InstallDIM": "Install as an App",
     "InstallDIMBanner": "Install DIM as an app on your home screen",
     "Inventory": "Inventory",

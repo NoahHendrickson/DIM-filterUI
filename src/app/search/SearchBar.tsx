@@ -806,7 +806,9 @@ function SearchBar({
             onAccept={isPhonePortrait ? acceptGhost : undefined}
           />
           <span aria-live="polite" className={styles.ariaLive}>
-            {ghostVisible && ghostFullCandidate ? `Suggestion: ${ghostFullCandidate}` : ''}
+            {ghostVisible && ghostFullCandidate
+              ? t('Header.GhostSuggestion', { suggestion: ghostFullCandidate })
+              : ''}
           </span>
         </div>
         {!isPhonePortrait && hasTabAction && (
