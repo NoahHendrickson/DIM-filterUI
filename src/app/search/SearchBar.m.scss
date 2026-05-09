@@ -45,6 +45,15 @@
   opacity: 0.55;
 }
 
+.whisperKeyHelp {
+  margin-left: 5px;
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--theme-text-secondary) !important;
+  border-color: var(--theme-text-secondary) !important;
+  opacity: 0.75;
+}
+
 .searchInputGhosted {
   position: relative;
   z-index: 1;

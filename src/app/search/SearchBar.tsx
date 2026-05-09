@@ -178,14 +178,10 @@ const Row = memo(
   ({
     highlighted,
     item,
-    isPhonePortrait,
-    isTabAutocompleteItem,
     onClick,
   }: {
     highlighted: boolean;
     item: SearchItem;
-    isPhonePortrait: boolean;
-    isTabAutocompleteItem: boolean;
     onClick: (e: React.MouseEvent, item: SearchItem) => void;
   }) => (
     <>
@@ -197,10 +193,7 @@ const Row = memo(
       <p className={styles.menuItemQuery}>
         <RowContents item={item} />
       </p>
-      {!isPhonePortrait && isTabAutocompleteItem && (
-        <KeyHelp className={styles.keyHelp} combo="tab" />
-      )}
-      {!isPhonePortrait && highlighted && <KeyHelp className={styles.keyHelp} combo="enter" />}
+      {highlighted && <KeyHelp className={styles.keyHelp} combo="enter" />}
       {(item.type === SearchItemType.Recent || item.type === SearchItemType.Saved) && (
         <button
           type="button"
@@ -637,28 +630,12 @@ function SearchBar({
               }`}
               {...getItemProps({ item, index })}
             >
-              <Row
-                highlighted={highlightedIndex === index}
-                item={item}
-                isPhonePortrait={isPhonePortrait}
-                isTabAutocompleteItem={item === tabHintItem}
-                onClick={deleteSearch}
-              />
+              <Row highlighted={highlightedIndex === index} item={item} onClick={deleteSearch} />
             </li>
           ))}
       </ul>
     ),
-    [
-      deleteSearch,
-      getItemProps,
-      getMenuProps,
-      highlightedIndex,
-      isOpen,
-      isPhonePortrait,
-      items,
-      tabHintItem,
-      menuMaxHeight,
-    ],
+    [deleteSearch, getItemProps, getMenuProps, highlightedIndex, isOpen, items, menuMaxHeight],
   );
 
   return (
@@ -670,9 +647,12 @@ function SearchBar({
         <AppIcon {...getLabelProps({ icon: searchIcon, className: 'search-bar-icon' })} />
         <div className={styles.inputShell}>
           {useGhostMirror && (
-            <div className={styles.whisperBackdrop} aria-hidden>
+            <div className={styles.whisperBackdrop} role="presentation">
               <span className={styles.whisperMatch}>{liveQueryLive.slice(0, caretIndex)}</span>
               {whisperSuffix ? <span className={styles.whisperHint}>{whisperSuffix}</span> : null}
+              {whisperSuffix && isOpen && tabHintItem ? (
+                <KeyHelp className={styles.whisperKeyHelp} combo="tab" />
+              ) : null}
               <span className={styles.whisperMatch}>{liveQueryLive.slice(caretIndex)}</span>
             </div>
           )}
