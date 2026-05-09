@@ -250,7 +250,17 @@ describe('inlineCompletion', () => {
     ['is:bow ', null],
     // After a freeform value separator we get value candidates
     ['stat:', 'stat:rpm:'],
+    // setbonus is a manifest-driven freeform filter; it should still suggest
+    // its `setbonus:` keyword when the user has only typed `set`. The exact
+    // first candidate depends on filter ranking, but anything starting with
+    // setbonus is acceptable here - we just want to assert the filter shows up.
   ];
+
+  test('typing `set` offers a setbonus completion', () => {
+    const result = inlineCompletion('set', 3, filterComplete, language);
+    expect(result).toBeDefined();
+    expect(result!.candidates.some((c) => c.startsWith('setbonus'))).toBe(true);
+  });
 
   test.each(cases)('inline completion for {%s}', (queryWithCaret, expected) => {
     const [caretIndex, query] = extractCaret(queryWithCaret);

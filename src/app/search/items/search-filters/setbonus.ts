@@ -43,10 +43,18 @@ const setBonusFilters: ItemFilterDefinition[] = [
     format: 'freeform',
     destinyVersion: 2,
     suggestionsGenerator: ({ d2Definitions }) => {
+      // First entry is the bare keyword so autocomplete can suggest `setbonus:`
+      // when the user starts typing the filter name. Subsequent entries are
+      // fully-qualified `setbonus:<slug>` so they're recognised as values
+      // and not floating around as orphan slug suggestions.
+      const out = ['setbonus:'];
       if (!d2Definitions) {
-        return [];
+        return out;
       }
-      return getArmorSetBonusFilterOptions(d2Definitions).map((o) => o.slug);
+      for (const opt of getArmorSetBonusFilterOptions(d2Definitions)) {
+        out.push(`setbonus:${opt.slug}`);
+      }
+      return out;
     },
     filter:
       ({ filterValue }) =>
