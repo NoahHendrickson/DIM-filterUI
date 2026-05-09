@@ -230,6 +230,7 @@ describe('filterSortRecentSearches', () => {
 describe('inlineCompletion', () => {
   const searchConfig = buildItemSearchConfig(2, 'en');
   const filterComplete = makeFilterComplete(searchConfig);
+  const language = 'en' as const;
 
   // Each test case: a query (with optional `|` for caret) plus the expected first
   // ghost candidate string (or null if no inline completion should be offered).
@@ -253,7 +254,7 @@ describe('inlineCompletion', () => {
 
   test.each(cases)('inline completion for {%s}', (queryWithCaret, expected) => {
     const [caretIndex, query] = extractCaret(queryWithCaret);
-    const result = inlineCompletion(query, caretIndex, filterComplete, searchConfig);
+    const result = inlineCompletion(query, caretIndex, filterComplete, language);
     if (expected === null) {
       expect(result).toBeUndefined();
     } else {
@@ -263,7 +264,7 @@ describe('inlineCompletion', () => {
   });
 
   test('every candidate is a strict prefix-extension of the typed segment', () => {
-    const result = inlineCompletion('is:b', 4, filterComplete, searchConfig)!;
+    const result = inlineCompletion('is:b', 4, filterComplete, language)!;
     expect(result).toBeDefined();
     for (const candidate of result.candidates) {
       expect(candidate.length).toBeGreaterThan(result.typed.length);
@@ -272,7 +273,7 @@ describe('inlineCompletion', () => {
   });
 
   test('reports the correct segment range', () => {
-    const result = inlineCompletion('is:haspower is:b', 16, filterComplete, searchConfig)!;
+    const result = inlineCompletion('is:haspower is:b', 16, filterComplete, language)!;
     expect(result).toBeDefined();
     expect(result.segmentStart).toBe(12);
     expect(result.segmentEnd).toBe(16);
@@ -284,7 +285,7 @@ describe('inlineCompletion', () => {
     // filter has explicit suggestions; this confirms the helper itself is fine.
     const fc = (term: string) =>
       term === 'tag:' ? ['tag:favorite', 'tag:keep', 'tag:junk', 'tag:infuse'] : [];
-    const result = inlineCompletion('tag:', 4, fc, searchConfig)!;
+    const result = inlineCompletion('tag:', 4, fc, language)!;
     expect(result).toBeDefined();
     expect(result.candidates).toHaveLength(4);
     expect(result.typed).toBe('tag:');
@@ -292,12 +293,12 @@ describe('inlineCompletion', () => {
 
   test('mid-segment caret suppresses inline completion', () => {
     const fc = () => ['is:bow'];
-    const result = inlineCompletion('is:b ow', 4, fc, searchConfig);
+    const result = inlineCompletion('is:b ow', 4, fc, language);
     // Caret at position 4 - the next char is a space, so this is end-of-segment;
     // confirm we DO get a result here.
     expect(result).toBeDefined();
     // But if the caret is BEFORE the space (still inside 'b'), nothing.
-    const result2 = inlineCompletion('isbow', 2, fc, searchConfig);
+    const result2 = inlineCompletion('isbow', 2, fc, language);
     expect(result2).toBeUndefined();
   });
 });

@@ -1,4 +1,5 @@
 import { Search } from '@destinyitemmanager/dim-api-types';
+import { DimLanguage } from 'app/i18n';
 import { compact, filterMap, uniqBy } from 'app/utils/collections';
 import { chainComparator, compareBy, reverseComparator } from 'app/utils/comparators';
 import { ArmoryEntry, getArmorySuggestions } from './armory-search';
@@ -395,11 +396,11 @@ export interface InlineCompletion {
  * because the user is browsing), whereas the inline ghost must be acceptable as a
  * pure forward-completion of what's already on screen.
  */
-export function inlineCompletion<I, FilterCtx, SuggestionsCtx>(
+export function inlineCompletion(
   query: string,
   caretIndex: number,
   filterComplete: (term: string) => string[],
-  searchConfig: SearchConfig<I, FilterCtx, SuggestionsCtx>,
+  language: DimLanguage,
 ): InlineCompletion | undefined {
   if (!query) {
     return undefined;
@@ -430,10 +431,10 @@ export function inlineCompletion<I, FilterCtx, SuggestionsCtx>(
     if (allCandidates.length === 0) {
       continue;
     }
-    const typedPlain = plainString(term, searchConfig.language);
+    const typedPlain = plainString(term, language);
     const prefixMatches: string[] = [];
     for (const candidate of allCandidates) {
-      const candidatePlain = plainString(candidate, searchConfig.language);
+      const candidatePlain = plainString(candidate, language);
       // Strict prefix-extension: candidate must be longer than what's been typed,
       // and start with it. This guarantees the ghost only ever appends characters.
       if (candidatePlain.length > typedPlain.length && candidatePlain.startsWith(typedPlain)) {

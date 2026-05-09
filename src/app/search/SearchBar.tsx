@@ -49,7 +49,12 @@ import {
 import HighlightedText from './HighlightedText';
 import * as styles from './SearchBar.m.scss';
 import { buildArmoryIndex } from './armory-search';
-import createAutocompleter, { SearchItem, SearchItemType } from './autocomplete';
+import createAutocompleter, {
+  SearchItem,
+  SearchItemType,
+  inlineCompletion,
+  makeFilterComplete,
+} from './autocomplete';
 import { searchConfigSelector, validateQuerySelector } from './items/item-search-filter';
 import {
   loadoutSearchConfigSelector,
@@ -84,6 +89,12 @@ const loadoutAutoCompleterSelector = createSelector(
   loadoutSearchConfigSelector,
   () => undefined,
   createAutocompleter,
+);
+
+const filterCompleteSelector = createSelector(searchConfigSelector, makeFilterComplete);
+const loadoutFilterCompleteSelector = createSelector(
+  loadoutSearchConfigSelector,
+  makeFilterComplete,
 );
 
 const LazyFilterHelp = lazy(() => import(/* webpackChunkName: "filter-help" */ './FilterHelp'));
@@ -177,6 +188,71 @@ const Row = memo(
 
 // TODO: break filter autocomplete into its own object/helpers... with tests
 
+/**
+ * Renders the in-line ghost text suffix that previews the top inline
+ * autocomplete candidate. The component overlays the input element using a
+ * shadow-span that mirrors the user's typed prefix, then paints the suggestion
+ * tail in dimmed text aligned to the caret.
+ */
+const GhostOverlay = memo(function GhostOverlay({
+  inputRef,
+  query,
+  caretIndex,
+  ghostText,
+  visible,
+  onAccept,
+}: {
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  query: string;
+  caretIndex: number;
+  ghostText: string;
+  visible: boolean;
+  onAccept?: () => void;
+}) {
+  const layerRef = useRef<HTMLDivElement>(null);
+
+  // Mirror the input's horizontal scroll so the dimmed suffix stays aligned
+  // even when the typed query overflows the input width.
+  useEffect(() => {
+    const input = inputRef.current;
+    const layer = layerRef.current;
+    if (!input || !layer) {
+      return;
+    }
+    const onScroll = () => {
+      layer.style.transform = `translateX(${-input.scrollLeft}px)`;
+    };
+    onScroll();
+    input.addEventListener('scroll', onScroll, { passive: true });
+    return () => input.removeEventListener('scroll', onScroll);
+  }, [inputRef, query, caretIndex, ghostText, visible]);
+
+  if (!visible || !ghostText) {
+    return null;
+  }
+  const before = query.slice(0, caretIndex);
+  const after = query.slice(caretIndex);
+  return (
+    <div ref={layerRef} className={styles.ghostLayer} aria-hidden="true">
+      <span>{before}</span>
+      <span
+        className={styles.ghostSuffix}
+        onMouseDown={
+          onAccept
+            ? (e) => {
+                e.preventDefault();
+                onAccept();
+              }
+            : undefined
+        }
+      >
+        {ghostText}
+      </span>
+      {after && <span>{after}</span>}
+    </div>
+  );
+});
+
 /** An interface for interacting with the search filter through a ref */
 export interface SearchFilterRef {
   /** Switch focus to the filter field */
@@ -239,6 +315,14 @@ function SearchBar({
   const validateQuery = useSelector(
     searchType === SearchType.Loadout ? validateLoadoutQuerySelector : validateQuerySelector,
   );
+  // Select both filterComplete fns unconditionally; the type-system requires
+  // picking one selector per useSelector call, but this is cheap and Redux
+  // memoises both.
+  const itemFilterComplete = useSelector(filterCompleteSelector);
+  const loadoutFilterCompleteFn = useSelector(loadoutFilterCompleteSelector);
+  const filterComplete =
+    searchType === SearchType.Loadout ? loadoutFilterCompleteFn : itemFilterComplete;
+  const language = useSelector(languageSelector);
 
   // On iOS at least, focusing the keyboard pushes the content off the screen
   const autoFocus = !mainSearchBar && !isPhonePortrait && !isiOSBrowser();
@@ -302,6 +386,31 @@ function SearchBar({
     [autocompleter, caretPosition, liveQuery, mainSearchBar, recentSearches, maxResults],
   );
 
+  // The strict prefix-only completion that powers the inline ghost text and Tab
+  // cycling. Recomputed on every render but cheap (it reuses the same
+  // filterComplete the dropdown uses).
+  const inline = useMemo(
+    () => inlineCompletion(liveQuery, caretPosition, filterComplete, language),
+    [liveQuery, caretPosition, filterComplete, language],
+  );
+
+  // Active Tab cycle. Set by the Tab handler when we accept the first candidate
+  // for a segment, advanced on subsequent Tab presses, cleared on any other
+  // input change.
+  interface CycleState {
+    segmentStart: number;
+    candidates: string[];
+    index: number;
+    materializedLength: number;
+  }
+  const cycleStateRef = useRef<CycleState | null>(null);
+  // Mirror cycle state in React state so we can re-render the keyboard help
+  // (count, shift+tab affordance) when it changes.
+  const [activeCycle, setActiveCycle] = useState<CycleState | null>(null);
+  // Set immediately before our Tab handler synthesizes an `insertText` so that
+  // the resulting onInputValueChange knows to keep the active cycle.
+  const tabAdvancingRef = useRef(false);
+
   // useCombobox from Downshift manages the state of the dropdown
   const {
     isOpen,
@@ -326,8 +435,47 @@ function SearchBar({
       if (type === useCombobox.stateChangeTypes.FunctionReset) {
         onClear?.();
       }
+      // Any input change that wasn't initiated by our own Tab handler ends the
+      // cycle. The Tab handler sets `tabAdvancingRef` for exactly one
+      // onInputValueChange to bypass this.
+      if (tabAdvancingRef.current) {
+        tabAdvancingRef.current = false;
+      } else if (cycleStateRef.current) {
+        cycleStateRef.current = null;
+        setActiveCycle(null);
+      }
     },
   });
+
+  // Compute the inline ghost suffix. Show only when:
+  // - we have at least one prefix-matching candidate;
+  // - the dropdown is open (we treat closed dropdown as "user dismissed
+  //   suggestions" - mirrors browser/IDE convention);
+  // - the input doesn't have an active selection.
+  const ghostFullCandidate = inline?.candidates[0];
+  const ghostText =
+    inline && ghostFullCandidate ? ghostFullCandidate.slice(inline.typed.length) : '';
+  const inputHasSelection = (() => {
+    const el = inputElement.current;
+    return Boolean(el && el.selectionStart !== null && el.selectionStart !== el.selectionEnd);
+  })();
+  const ghostVisible = Boolean(ghostText && isOpen && !inputHasSelection);
+
+  // Tap-to-accept handler for the inline ghost suffix on phone-portrait.
+  const acceptGhost = () => {
+    if (inline && inline.candidates.length > 0) {
+      const first = inline.candidates[0];
+      const input = inputElement.current;
+      if (input) {
+        input.focus();
+        tabAdvancingRef.current = true;
+        input.setSelectionRange(inline.segmentStart, inline.segmentEnd);
+        document.execCommand('insertText', false, first);
+        const newCaret = inline.segmentStart + first.length;
+        input.setSelectionRange(newCaret, newCaret);
+      }
+    }
+  };
 
   // special click handling for filter helper
   function stateReducer(
@@ -405,26 +553,128 @@ function SearchBar({
     [clearFilter],
   );
 
-  // Implement tab completion on the tab key. If the highlighted item is an autocomplete suggestion,
-  // accept it. Otherwise, we scan from the beginning to find the first autocomplete suggestion and
-  // accept that. If there's nothing to accept, the tab key does its normal thing, which is to switch
-  // focus. The tabAutocompleteItem is computed as part of render so we can offer keyboard help.
+  // The dropdown still highlights one row as the "Tab target" for keyboard help;
+  // when the user highlights an autocomplete row in the dropdown, prefer that
+  // over the inline ghost. Otherwise fall back to the inline completion's first
+  // candidate (so keyboard help is shown even before the user opens the menu).
   const tabAutocompleteItem =
     highlightedIndex > 0 && items[highlightedIndex]?.type === SearchItemType.Autocomplete
       ? items[highlightedIndex]
-      : items.find((s) => s.type === SearchItemType.Autocomplete && s.query.fullText !== liveQuery);
+      : undefined;
+
+  // True if we have *something* the Tab key can do (advance the cycle, accept
+  // the dropdown highlight, or accept the inline ghost).
+  const hasTabAction = Boolean(
+    cycleStateRef.current ?? tabAutocompleteItem ?? (inline && inline.candidates.length > 0),
+  );
+
+  /**
+   * Replace the current segment in the input with `candidate`, leaving the caret
+   * at the end of the inserted text. Uses `execCommand('insertText')` so the
+   * user can undo with Ctrl/Cmd-Z, matching the previous Tab behaviour.
+   */
+  const replaceSegment = (segmentStart: number, segmentEnd: number, candidate: string) => {
+    const input = inputElement.current;
+    if (!input) {
+      return;
+    }
+    tabAdvancingRef.current = true;
+    input.setSelectionRange(segmentStart, segmentEnd);
+    document.execCommand('insertText', false, candidate);
+    const newCaret = segmentStart + candidate.length;
+    input.setSelectionRange(newCaret, newCaret);
+  };
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Tab' && !e.altKey && !e.ctrlKey && tabAutocompleteItem && isOpen) {
-      e.preventDefault();
-      if (inputElement.current) {
-        // Use execCommand to make the insertion as if the user typed it, so it can be undone with Ctrl-Z
-        inputElement.current.setSelectionRange(0, inputElement.current.value.length);
-        document.execCommand('insertText', false, tabAutocompleteItem.query.fullText);
-        if (tabAutocompleteItem.highlightRange) {
-          const cursorPos = tabAutocompleteItem.highlightRange.range[1];
-          inputElement.current.setSelectionRange(cursorPos, cursorPos);
+    if (
+      e.key === 'Tab' &&
+      !e.altKey &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      // Don't interfere with IME composition.
+      !e.nativeEvent.isComposing
+    ) {
+      const direction = e.shiftKey ? -1 : 1;
+      const cycle = cycleStateRef.current;
+      const input = inputElement.current;
+
+      // If we're already in an active cycle and the input still ends with our
+      // last materialised candidate, rotate to the next one.
+      if (cycle && input) {
+        const expected = cycle.candidates[cycle.index];
+        const actual = input.value.slice(
+          cycle.segmentStart,
+          cycle.segmentStart + cycle.materializedLength,
+        );
+        if (
+          actual === expected &&
+          input.selectionStart === input.selectionEnd &&
+          input.selectionStart === cycle.segmentStart + cycle.materializedLength
+        ) {
+          e.preventDefault();
+          const nextIndex =
+            (cycle.index + direction + cycle.candidates.length) % cycle.candidates.length;
+          const nextCandidate = cycle.candidates[nextIndex];
+          replaceSegment(
+            cycle.segmentStart,
+            cycle.segmentStart + cycle.materializedLength,
+            nextCandidate,
+          );
+          const nextCycle: CycleState = {
+            ...cycle,
+            index: nextIndex,
+            materializedLength: nextCandidate.length,
+          };
+          cycleStateRef.current = nextCycle;
+          setActiveCycle(nextCycle);
+          return;
         }
+        // Cycle is stale (user moved cursor or edited around it).
+        cycleStateRef.current = null;
+        setActiveCycle(null);
       }
+
+      // No cycle in progress: try to start one. We prefer the dropdown's
+      // highlighted autocomplete item (Shift+Tab through the dropdown is a
+      // legitimate user gesture), otherwise fall back to the inline ghost.
+      if (tabAutocompleteItem && isOpen) {
+        e.preventDefault();
+        if (input) {
+          input.setSelectionRange(0, input.value.length);
+          tabAdvancingRef.current = true;
+          document.execCommand('insertText', false, tabAutocompleteItem.query.fullText);
+          if (tabAutocompleteItem.highlightRange) {
+            const cursorPos = tabAutocompleteItem.highlightRange.range[1];
+            input.setSelectionRange(cursorPos, cursorPos);
+          }
+        }
+        return;
+      }
+
+      if (inline && inline.candidates.length > 0) {
+        e.preventDefault();
+        const startIndex = direction > 0 ? 0 : inline.candidates.length - 1;
+        const first = inline.candidates[startIndex];
+        replaceSegment(inline.segmentStart, inline.segmentEnd, first);
+        // If the accepted candidate ends with `:` (a keyword waiting for a
+        // value), don't start a cycle - the next Tab will recompute fresh
+        // candidates against the new typed prefix and produce the value list.
+        if (first.endsWith(':')) {
+          cycleStateRef.current = null;
+          setActiveCycle(null);
+        } else {
+          const newCycle: CycleState = {
+            segmentStart: inline.segmentStart,
+            candidates: inline.candidates,
+            index: startIndex,
+            materializedLength: first.length,
+          };
+          cycleStateRef.current = newCycle;
+          setActiveCycle(newCycle);
+        }
+        return;
+      }
+      // Fall through: nothing to complete, default Tab behaviour (focus change).
     } else if (e.key === 'Home' || e.key === 'End') {
       // Disable the use of Home/End to select items in the menu
       // https://github.com/downshift-js/downshift/issues/1162
@@ -499,24 +749,51 @@ function SearchBar({
         role="search"
       >
         <AppIcon {...getLabelProps({ icon: searchIcon, className: 'search-bar-icon' })} />
-        <input
-          {...getInputProps({
-            onBlur,
-            onKeyDown,
-            ref: inputElement,
-            className: clsx({ [styles.invalid]: !valid }),
-            autoComplete: 'off',
-            autoCorrect: 'off',
-            autoCapitalize: 'off',
-            spellCheck: false,
-            autoFocus,
-            placeholder,
-            type: 'text',
-            name: 'filter',
-            'aria-label': placeholder,
-          })}
-          enterKeyHint="search"
-        />
+        <div className={styles.inputWrap}>
+          <input
+            {...getInputProps({
+              onBlur,
+              onKeyDown,
+              ref: inputElement,
+              className: clsx({ [styles.invalid]: !valid }),
+              autoComplete: 'off',
+              autoCorrect: 'off',
+              autoCapitalize: 'off',
+              spellCheck: false,
+              autoFocus,
+              placeholder,
+              type: 'text',
+              name: 'filter',
+              'aria-label': placeholder,
+              'aria-autocomplete': 'both',
+            })}
+            enterKeyHint="search"
+          />
+          <GhostOverlay
+            inputRef={inputElement}
+            query={liveQuery}
+            caretIndex={caretPosition}
+            ghostText={ghostText}
+            visible={ghostVisible}
+            onAccept={isPhonePortrait ? acceptGhost : undefined}
+          />
+          <span aria-live="polite" className={styles.ariaLive}>
+            {ghostVisible && ghostFullCandidate ? `Suggestion: ${ghostFullCandidate}` : ''}
+          </span>
+        </div>
+        {!isPhonePortrait && hasTabAction && (
+          <span className={styles.ghostKeyHelp} aria-hidden="true">
+            <KeyHelp combo="tab" />
+            {activeCycle && activeCycle.candidates.length > 1 && (
+              <>
+                <KeyHelp combo="shift+tab" />
+                <span className={styles.ghostCycleCount}>
+                  {activeCycle.index + 1}/{activeCycle.candidates.length}
+                </span>
+              </>
+            )}
+          </span>
+        )}
         <LayoutGroup>
           <AnimatePresence>
             {children}

@@ -54,6 +54,87 @@
   color: var(--theme-text-secondary) !important;
 }
 
+// Wraps the <input> so the inline ghost overlay can sit on top of it,
+// aligned to the same flex track. The wrap takes the input's old `flex: 1`
+// behaviour from `search-filter.scss` so the layout is unchanged.
+.inputWrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+
+  > input[type='text'] {
+    flex: 1;
+    width: 0;
+    min-width: 0;
+    background: transparent;
+    position: relative;
+    z-index: 1;
+  }
+}
+
+// Ghost layer: a positioned mirror of the input contents that paints just the
+// completion suffix in dimmed text, perfectly aligned with the caret.
+// We render the user's typed prefix transparently so its layout pushes the
+// ghost suffix to the correct x-position; this is the same "shadow span"
+// trick used by GitHub-style mention typeaheads.
+.ghostLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  padding: 7px 0;
+  pointer-events: none;
+  user-select: none;
+  color: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+  white-space: pre;
+  text-rendering: inherit;
+}
+
+.ghostSuffix {
+  color: var(--theme-text-secondary);
+  opacity: 0.55;
+}
+
+// On phone-portrait, allow tapping the ghost suffix to accept it.
+:global(.phone-portrait) .ghostSuffix {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.ghostKeyHelp {
+  margin: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--theme-text-secondary);
+  opacity: 0.7;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.ghostCycleCount {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+// Visually-hidden live region used to announce ghost suggestions to AT.
+.ariaLive {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
 .openButton {
   composes: resetButton from '../dim-ui/common.m.scss';
   display: inline-block;
