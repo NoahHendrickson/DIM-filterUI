@@ -23,13 +23,11 @@
       box-shadow: inset 0 0 0 1px var(--theme-search-dropdown-border);
     }
 
-    // Focus is intentionally a single-pixel underline in DIM orange instead of
-    // a full inset border. The full border subtly resizes the input area
-    // (browsers reflow children of an outlined element by 1px), which made the
-    // ghost overlay drift and pushed the Tab key-help affordance.
+    // Focus deliberately doesn't draw any border / underline - that would
+    // either resize the inner content (outline-width) or push the Tab
+    // affordance around. Instead we recolour the leading search icon below.
     &:focus-within {
       outline: none;
-      box-shadow: inset 0 -1px 0 0 var(--theme-accent-primary);
     }
 
     ::placeholder {
@@ -55,6 +53,13 @@
     color: #999;
     margin: 0 6px 0 4px;
     font-size: 12px !important;
+    transition: color 120ms ease-out;
+  }
+
+  // Focus state: recolour the leading magnifying-glass icon so it's the
+  // only "active input" indicator. No layout-affecting underline / border.
+  .search-filter:focus-within .search-bar-icon {
+    color: var(--theme-accent-primary);
   }
 
   .mobile-search-link {
