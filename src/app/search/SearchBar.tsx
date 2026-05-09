@@ -49,7 +49,7 @@ import {
 import HighlightedText from './HighlightedText';
 import * as styles from './SearchBar.m.scss';
 import { buildArmoryIndex } from './armory-search';
-import createAutocompleter, { SearchItem, SearchItemType } from './autocomplete';
+import createAutocompleter, { SearchItem, SearchItemType, getGhostSuffix } from './autocomplete';
 import { searchConfigSelector, validateQuerySelector } from './items/item-search-filter';
 import {
   loadoutSearchConfigSelector,
@@ -247,6 +247,9 @@ function SearchBar({
   const [filterHelpOpen, setFilterHelpOpen] = useState(false);
   const [armoryItemHash, setArmoryItemHash] = useState<number | undefined>(undefined);
   const [menuMaxHeight, setMenuMaxHeight] = useState<undefined | number>();
+  // Index into ghostCandidates that determines which inline ghost suggestion is displayed/accepted.
+  // Reset to 0 whenever the live query changes; advanced by Shift+Tab.
+  const [ghostCycleIndex, setGhostCycleIndex] = useState(0);
   const inputElement = useRef<HTMLInputElement>(null);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -301,6 +304,30 @@ function SearchBar({
       ),
     [autocompleter, caretPosition, liveQuery, mainSearchBar, recentSearches, maxResults],
   );
+
+  // Inline ghost-text candidates: items whose suggestion strictly extends what's typed at the caret.
+  // Driven by the same ranked list as the dropdown so ordering is consistent.
+  const ghostCandidates = useMemo(() => {
+    const result: { item: SearchItem; suffix: string }[] = [];
+    for (const item of items) {
+      const suffix = getGhostSuffix(liveQuery, caretPosition, item);
+      if (suffix !== null) {
+        result.push({ item, suffix });
+      }
+    }
+    return result;
+  }, [items, liveQuery, caretPosition]);
+
+  const activeGhost =
+    ghostCandidates.length > 0
+      ? ghostCandidates[ghostCycleIndex % ghostCandidates.length]
+      : undefined;
+
+  // Reset cycle index whenever the typed query changes (typing, Tab acceptance, programmatic reset).
+  // Shift+Tab cycling does not change liveQuery, so the index persists across cycles.
+  useEffect(() => {
+    setGhostCycleIndex(0);
+  }, [liveQuery]);
 
   // useCombobox from Downshift manages the state of the dropdown
   const {
@@ -405,16 +432,40 @@ function SearchBar({
     [clearFilter],
   );
 
-  // Implement tab completion on the tab key. If the highlighted item is an autocomplete suggestion,
-  // accept it. Otherwise, we scan from the beginning to find the first autocomplete suggestion and
-  // accept that. If there's nothing to accept, the tab key does its normal thing, which is to switch
-  // focus. The tabAutocompleteItem is computed as part of render so we can offer keyboard help.
-  const tabAutocompleteItem =
+  // Implement tab completion on the tab key. Priority order:
+  //   1. If the user has navigated the dropdown via arrow keys, accept the highlighted row.
+  //   2. Otherwise, accept the active inline ghost suggestion (cycled with Shift+Tab).
+  //   3. Otherwise, fall back to the first non-self autocomplete item from the dropdown
+  //      (this preserves the legacy behavior for fuzzy matches that don't qualify as ghost text).
+  // If there's nothing to accept, the tab key does its normal thing, which is to switch focus.
+  // The tabAutocompleteItem is computed as part of render so we can offer keyboard help.
+  const tabAutocompleteItem: SearchItem | undefined =
     highlightedIndex > 0 && items[highlightedIndex]?.type === SearchItemType.Autocomplete
       ? items[highlightedIndex]
-      : items.find((s) => s.type === SearchItemType.Autocomplete && s.query.fullText !== liveQuery);
+      : (activeGhost?.item ??
+        items.find(
+          (s) => s.type === SearchItemType.Autocomplete && s.query.fullText !== liveQuery,
+        ));
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Tab' && !e.altKey && !e.ctrlKey && tabAutocompleteItem && isOpen) {
+    if (
+      e.key === 'Tab' &&
+      e.shiftKey &&
+      !e.altKey &&
+      !e.ctrlKey &&
+      activeGhost &&
+      ghostCandidates.length > 1
+    ) {
+      // Cycle to the next inline ghost suggestion without changing the typed query.
+      e.preventDefault();
+      setGhostCycleIndex((i) => (i + 1) % ghostCandidates.length);
+    } else if (
+      e.key === 'Tab' &&
+      !e.shiftKey &&
+      !e.altKey &&
+      !e.ctrlKey &&
+      tabAutocompleteItem &&
+      isOpen
+    ) {
       e.preventDefault();
       if (inputElement.current) {
         // Use execCommand to make the insertion as if the user typed it, so it can be undone with Ctrl-Z
@@ -499,24 +550,33 @@ function SearchBar({
         role="search"
       >
         <AppIcon {...getLabelProps({ icon: searchIcon, className: 'search-bar-icon' })} />
-        <input
-          {...getInputProps({
-            onBlur,
-            onKeyDown,
-            ref: inputElement,
-            className: clsx({ [styles.invalid]: !valid }),
-            autoComplete: 'off',
-            autoCorrect: 'off',
-            autoCapitalize: 'off',
-            spellCheck: false,
-            autoFocus,
-            placeholder,
-            type: 'text',
-            name: 'filter',
-            'aria-label': placeholder,
-          })}
-          enterKeyHint="search"
-        />
+        <div className={styles.inputWrap}>
+          <input
+            {...getInputProps({
+              onBlur,
+              onKeyDown,
+              ref: inputElement,
+              className: clsx({ [styles.invalid]: !valid }),
+              autoComplete: 'off',
+              autoCorrect: 'off',
+              autoCapitalize: 'off',
+              spellCheck: false,
+              autoFocus,
+              placeholder,
+              type: 'text',
+              name: 'filter',
+              'aria-label': placeholder,
+            })}
+            enterKeyHint="search"
+          />
+          {activeGhost && !isPhonePortrait && (
+            <div className={styles.ghostOverlay} aria-hidden>
+              <span className={styles.ghostMirror}>{liveQuery}</span>
+              <span className={styles.ghostText}>{activeGhost.suffix}</span>
+              <KeyHelp combo="tab" />
+            </div>
+          )}
+        </div>
         <LayoutGroup>
           <AnimatePresence>
             {children}

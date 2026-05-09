@@ -59,6 +59,39 @@ export type SearchItem =
       type: Exclude<SearchItemType, SearchItemType.ArmoryEntry>;
     });
 
+/**
+ * Compute the inline ghost-text suffix that should appear at the caret given a SearchItem suggestion.
+ *
+ * Returns the suffix text to render as ghost text, or null when the suggestion is not a clean extension
+ * of what the user has typed (for example because it would replace earlier characters via fuzzy match).
+ *
+ * Only `Autocomplete`-type items qualify. The suggestion's `fullText` must be a strict prefix-extension
+ * of the typed query (case-insensitive), and the caret must be at the end of the input. Anything else
+ * still surfaces in the dropdown but is not safe to render as a clean inline ghost.
+ */
+export function getGhostSuffix(
+  typedQuery: string,
+  caretIndex: number,
+  item: SearchItem,
+): string | null {
+  if (item.type !== SearchItemType.Autocomplete) {
+    return null;
+  }
+  // Only render ghost text when the caret is at the end of the input. Mid-string ghosting is out of scope.
+  if (caretIndex !== typedQuery.length) {
+    return null;
+  }
+  const fullText = item.query.fullText;
+  if (fullText.length <= typedQuery.length) {
+    return null;
+  }
+  // Suggestion must strictly extend what's typed. Compared case-insensitively to tolerate user casing.
+  if (fullText.substring(0, typedQuery.length).toLowerCase() !== typedQuery.toLowerCase()) {
+    return null;
+  }
+  return fullText.substring(typedQuery.length);
+}
+
 /** matches a keyword that's probably a math comparison, but not with a value on the RHS */
 const mathCheck = /[\d<>=]$/;
 

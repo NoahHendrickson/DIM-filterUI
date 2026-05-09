@@ -5,6 +5,56 @@
   font-size: 13px;
 }
 
+// Wraps the <input> so the inline ghost-text overlay can be absolutely positioned over it
+// without interfering with the search-filter's flex layout.
+.inputWrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+// The wrap replaces the input as the direct flex child of .search-filter, so the existing
+// `.search-filter > input[type='text']` rule no longer applies. We re-declare equivalent
+// styling here, scoped to inputs inside the wrap.
+.inputWrap > input[type='text'] {
+  all: initial;
+  outline: none;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 0;
+  font-size: inherit;
+  font-family: inherit;
+  color: inherit;
+  caret-color: var(--theme-accent-primary);
+}
+
+// Faded inline suggestion that appears at the caret. Sits over the input but ignores all pointer
+// input. The mirror span is rendered invisibly so the visible suffix lines up with the caret.
+.ghostOverlay {
+  position: absolute;
+  inset: 0;
+  padding: 7px 0;
+  pointer-events: none;
+  white-space: pre;
+  overflow: hidden;
+  font-size: inherit;
+  font-family: inherit;
+  color: var(--theme-text);
+
+  @include phone-portrait {
+    display: none;
+  }
+}
+
+.ghostMirror {
+  visibility: hidden;
+}
+
+.ghostText {
+  opacity: 0.4;
+}
+
 .open {
   border-bottom-left-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
