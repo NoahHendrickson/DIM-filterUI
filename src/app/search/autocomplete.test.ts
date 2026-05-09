@@ -2,7 +2,9 @@ import { Search, SearchType } from '@destinyitemmanager/dim-api-types';
 import {
   autocompleteTermSuggestions,
   filterSortRecentSearches,
+  isValueTabCycleMode,
   makeFilterComplete,
+  resolveTermForAutocomplete,
 } from './autocomplete';
 import { buildItemSearchConfig } from './items/item-search-filter';
 import { quoteFilterString } from './query-parser';
@@ -235,5 +237,25 @@ describe('filterComplete', () => {
   test.each(terms)('autocomplete terms for |%s|', (term) => {
     const candidates = filterComplete(term);
     expect(candidates).toMatchSnapshot();
+  });
+});
+
+describe('tab completion helpers', () => {
+  const searchConfig = buildItemSearchConfig(2, 'en');
+  const filterComplete = makeFilterComplete(searchConfig);
+
+  test('isValueTabCycleMode is true after keyword:', () => {
+    expect(isValueTabCycleMode('is:b', searchConfig)).toBe(true);
+    expect(isValueTabCycleMode('stat:mob', searchConfig)).toBe(true);
+  });
+
+  test('isValueTabCycleMode is false while typing the keyword', () => {
+    expect(isValueTabCycleMode('stat', searchConfig)).toBe(false);
+    expect(isValueTabCycleMode('perk', searchConfig)).toBe(false);
+  });
+
+  test('resolveTermForAutocomplete finds active incomplete segment', () => {
+    const resolved = resolveTermForAutocomplete('is:weapon is:b', 14, filterComplete);
+    expect(resolved?.term).toBe('is:b');
   });
 });

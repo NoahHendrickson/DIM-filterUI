@@ -135,15 +135,15 @@ export default function createAutocompleter<I, FilterCtx, SuggestionsCtx>(
       ? getArmorySuggestions(armoryEntries, query, searchConfig.language)
       : [];
 
-    // mix them together
-    return [
-      ...uniqBy(
-        compact([queryItem, ...filterSuggestions, ...recentSearchItems]),
-        (i) => i.query.fullText,
-      ).slice(0, maxResults),
-      ...armorySuggestions,
-      helpItem,
-    ];
+    // Prefer filter completions over history so parameter/value suggestions stay visible.
+    const filterCap = Math.max(4, Math.floor(maxResults / 2));
+    const filterTruncated = filterSuggestions.slice(0, filterCap);
+    const primary = uniqBy(
+      compact([queryItem, ...filterTruncated, ...recentSearchItems]),
+      (i) => i.query.fullText,
+    ).slice(0, maxResults);
+
+    return [...primary, ...armorySuggestions, helpItem];
   };
 }
 
@@ -242,7 +242,110 @@ export function filterSortRecentSearches(query: string, recentSearches: Search[]
   });
 }
 
-const caretEndRegex = /[\s)]|$/;
+export const caretEndRegex = /[\s)]|$/;
+
+/** Keyword prefixes for freeform KV filters (e.g. `name:`), used for completion routing */
+export function getFreeformKeywordPrefixes<I, FilterCtx, SuggestionsCtx>(
+  searchConfig: SearchConfig<I, FilterCtx, SuggestionsCtx>,
+): string[] {
+  const keys: string[] = [];
+  for (const filter of Object.values(searchConfig.filtersMap.kvFilters)) {
+    const formats = canonicalFilterFormats(filter.format);
+    if (!formats.includes('freeform')) {
+      continue;
+    }
+    const filterKeywords = Array.isArray(filter.keywords) ? filter.keywords : [filter.keywords];
+    for (const k of filterKeywords) {
+      keys.push(`${k}:`);
+    }
+  }
+  return keys;
+}
+
+/**
+ * After an incomplete filter term (e.g. `is:b` or `name:foo`), Tab cycles through value
+ * suggestions; while typing the filter keyword (`stat`, `is`) Tab completes the parameter.
+ */
+export function isValueTabCycleMode<I, FilterCtx, SuggestionsCtx>(
+  incompleteTerm: string,
+  searchConfig: SearchConfig<I, FilterCtx, SuggestionsCtx>,
+): boolean {
+  const typedPlain = plainString(incompleteTerm.toLowerCase(), searchConfig.language);
+  const freeformPrefixes = getFreeformKeywordPrefixes(searchConfig);
+  if (freeformPrefixes.some((p) => typedPlain.startsWith(p))) {
+    return true;
+  }
+  return typedPlain.includes(':');
+}
+
+export interface AutocompleteTermResolution {
+  /** Query text before the incomplete filter term */
+  base: string;
+  /** Character index where the incomplete term begins */
+  termStartIndex: number;
+  /** Raw incomplete substring (same rules as {@link autocompleteTermSuggestions}) */
+  term: string;
+  /** Caret boundary used when replacing the term (end of active token) */
+  caretEnd: number;
+}
+
+/**
+ * Locate which incomplete filter segment the autocompleter would expand (same first-match
+ * behavior as {@link autocompleteTermSuggestions}).
+ */
+export function resolveTermForAutocomplete(
+  query: string,
+  caretIndex: number,
+  filterComplete: (term: string) => string[],
+): AutocompleteTermResolution | null {
+  if (!query) {
+    return null;
+  }
+
+  const caretEnd = (caretEndRegex.exec(query.slice(caretIndex))?.index || 0) + caretIndex;
+  const queryUpToCaret = query.slice(0, caretEnd);
+  const lastFilters = findLastFilter(queryUpToCaret);
+  if (!lastFilters.length) {
+    return null;
+  }
+
+  for (const index of lastFilters) {
+    const term = queryUpToCaret.substring(index);
+    if (filterComplete(term).length) {
+      return {
+        base: query.slice(0, index),
+        termStartIndex: index,
+        term,
+        caretEnd,
+      };
+    }
+  }
+  return null;
+}
+
+/** Match acronym-style input (e.g. `sb`, `s-e-t`) to words in the suggestion text */
+function matchesWordStartAcronym(haystackPlain: string, acronymLetters: string): boolean {
+  if (acronymLetters.length < 2) {
+    return false;
+  }
+  const words = haystackPlain.split(/[\s:_-]+/).filter(Boolean);
+  let wi = 0;
+  for (const ch of acronymLetters.toLowerCase()) {
+    let matched = false;
+    while (wi < words.length) {
+      if (words[wi].toLowerCase().startsWith(ch)) {
+        wi++;
+        matched = true;
+        break;
+      }
+      wi++;
+    }
+    if (!matched) {
+      return false;
+    }
+  }
+  return true;
+}
 
 /**
  * Find the position of the last "incomplete" filter segment of the query before the caretIndex.
@@ -253,7 +356,7 @@ const caretEndRegex = /[\s)]|$/;
  *
  * @returns the start indexes of various points that could be incomplete filters
  */
-function findLastFilter(queryUpToCaret: string): number[] | null {
+function findLastFilter(queryUpToCaret: string): number[] {
   // Find the indexes where any incomplete filter starts. For example if the query is:
   // name:"foo" bar baz
   // then the open keywords are "bar baz" and "baz"
@@ -314,7 +417,7 @@ export function autocompleteTermSuggestions<I, FilterCtx, SuggestionsCtx>(
 
   const queryUpToCaret = query.slice(0, caretIndex);
   const lastFilters = findLastFilter(queryUpToCaret);
-  if (!lastFilters) {
+  if (!lastFilters.length) {
     return [];
   }
 
@@ -362,6 +465,46 @@ function findFilter<I, FilterCtx, SuggestionsCtx>(
   return filterName === 'is' ? filtersMap.isFilters[filterValue] : filtersMap.kvFilters[filterName];
 }
 
+function collapseAlphaNum(s: string) {
+  return s.replace(/[^a-z0-9]/gi, '');
+}
+
+function suggestionMatchesLoose(
+  word: Suggestion,
+  typedPlain: string,
+  mustStartWith: string,
+  matchType: 'includes' | 'startsWith',
+): boolean {
+  if (!word.plainText.startsWith(mustStartWith)) {
+    return false;
+  }
+  if (word.plainText[matchType](typedPlain)) {
+    return true;
+  }
+  const collapsedTyped = collapseAlphaNum(typedPlain);
+  if (collapsedTyped.length < 2) {
+    return false;
+  }
+  const collapsedFull = collapseAlphaNum(word.plainText);
+  if (matchType === 'startsWith') {
+    return (
+      collapsedFull.startsWith(collapsedTyped) ||
+      collapseAlphaNum(word.plainText.slice(mustStartWith.length)).startsWith(collapsedTyped)
+    );
+  }
+
+  // includes — typing a filter name (may include hyphens e.g. s-e-t). Skip collapsed substring
+  // match when the query has expression punctuation such as `(`, so `not(` does not match `tag:`.
+  const allowCollapsedSubstring =
+    collapsedTyped.length >= 2 &&
+    !/[()[\]{}]/.test(typedPlain) &&
+    collapsedFull.includes(collapsedTyped);
+
+  return (
+    Boolean(allowCollapsedSubstring) || matchesWordStartAcronym(word.plainText, collapsedTyped)
+  );
+}
+
 /**
  * This builds a filter-complete function that uses the given search config's keywords to
  * offer autocomplete suggestions for a partially typed term.
@@ -371,17 +514,13 @@ export function makeFilterComplete<I, FilterCtx, SuggestionsCtx>(
 ) {
   // these filters might include quotes, so we search for two text segments to ignore quotes & colon
   // i.e. `name:test` can find `name:"test item"`
-  const freeformTerms: string[] = [];
+  const freeformTerms = getFreeformKeywordPrefixes(searchConfig);
   const multiqueryTermsLookup: NodeJS.Dict<string[]> = {};
   for (const filter of Object.values(searchConfig.filtersMap.kvFilters)) {
     const formats = canonicalFilterFormats(filter.format);
-    if (formats.includes('freeform')) {
-      for (const k of filter.keywords) {
-        freeformTerms.push(`${k}:`);
-      }
-    }
     if (formats.includes('multiquery')) {
-      for (const k of filter.keywords) {
+      const filterKeywords = Array.isArray(filter.keywords) ? filter.keywords : [filter.keywords];
+      for (const k of filterKeywords) {
         (multiqueryTermsLookup[k] ??= []).push(...(filter.suggestions ?? []));
       }
     }
@@ -402,7 +541,7 @@ export function makeFilterComplete<I, FilterCtx, SuggestionsCtx>(
     // unless the user seems to explicity be working toward them
     const hasNotModifier = typedPlain.startsWith('not');
     const includesAdvancedMath =
-      typedPlain.endsWith(':') || typedPlain.endsWith('<') || typedPlain.endsWith('<');
+      typedPlain.endsWith(':') || typedPlain.endsWith('<') || typedPlain.endsWith('>');
     const filterLowPrioritySuggestions = (s: Suggestion) =>
       (hasNotModifier || !s.plainText.startsWith('not:')) &&
       (includesAdvancedMath || !/[<>]=?$/.test(s.plainText));
@@ -422,9 +561,7 @@ export function makeFilterComplete<I, FilterCtx, SuggestionsCtx>(
     const matchType = !mustStartWith && typedPlain.includes(':') ? 'startsWith' : 'includes';
 
     let suggestions = searchConfig.suggestions
-      .filter(
-        (word) => word.plainText.startsWith(mustStartWith) && word.plainText[matchType](typedPlain),
-      )
+      .filter((word) => suggestionMatchesLoose(word, typedPlain, mustStartWith, matchType))
       .filter(filterLowPrioritySuggestions);
 
     // TODO: sort this first?? it depends on term in one place

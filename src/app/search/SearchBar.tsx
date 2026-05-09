@@ -49,7 +49,13 @@ import {
 import HighlightedText from './HighlightedText';
 import * as styles from './SearchBar.m.scss';
 import { buildArmoryIndex } from './armory-search';
-import createAutocompleter, { SearchItem, SearchItemType } from './autocomplete';
+import createAutocompleter, {
+  SearchItem,
+  SearchItemType,
+  isValueTabCycleMode,
+  makeFilterComplete,
+  resolveTermForAutocomplete,
+} from './autocomplete';
 import { searchConfigSelector, validateQuerySelector } from './items/item-search-filter';
 import {
   loadoutSearchConfigSelector,
@@ -84,6 +90,12 @@ const loadoutAutoCompleterSelector = createSelector(
   loadoutSearchConfigSelector,
   () => undefined,
   createAutocompleter,
+);
+
+const itemFilterCompleteSelector = createSelector(searchConfigSelector, makeFilterComplete);
+const loadoutFilterCompleteSelector = createSelector(
+  loadoutSearchConfigSelector,
+  makeFilterComplete,
 );
 
 const LazyFilterHelp = lazy(() => import(/* webpackChunkName: "filter-help" */ './FilterHelp'));
@@ -239,15 +251,45 @@ function SearchBar({
   const validateQuery = useSelector(
     searchType === SearchType.Loadout ? validateLoadoutQuerySelector : validateQuerySelector,
   );
+  const filterComplete = useSelector(
+    searchType === SearchType.Loadout ? loadoutFilterCompleteSelector : itemFilterCompleteSelector,
+  );
+  const itemSearchConfig = useSelector(searchConfigSelector);
+  const loadoutSearchCfg = useSelector(loadoutSearchConfigSelector);
 
   // On iOS at least, focusing the keyboard pushes the content off the screen
   const autoFocus = !mainSearchBar && !isPhonePortrait && !isiOSBrowser();
 
   const [liveQueryLive, setLiveQuery] = useState(searchQuery ?? '');
+  const [caretIndex, setCaretIndex] = useState(() => (searchQuery ?? '').length);
+  const valueCycleRef = useRef<{ key: string; nextIndex: number }>({ key: '', nextIndex: 0 });
   const [filterHelpOpen, setFilterHelpOpen] = useState(false);
   const [armoryItemHash, setArmoryItemHash] = useState<number | undefined>(undefined);
   const [menuMaxHeight, setMenuMaxHeight] = useState<undefined | number>();
   const inputElement = useRef<HTMLInputElement>(null);
+
+  const syncCaretFromInput = useCallback(() => {
+    const el = inputElement.current;
+    if (el && el.selectionStart !== null) {
+      setCaretIndex(el.selectionStart);
+    }
+  }, []);
+
+  const applyAutocompleteItem = useCallback((item: SearchItem) => {
+    const input = inputElement.current;
+    if (!input) {
+      return;
+    }
+    input.setSelectionRange(0, input.value.length);
+    document.execCommand('insertText', false, item.query.fullText);
+    if (item.highlightRange) {
+      const cursorPos = item.highlightRange.range[1];
+      input.setSelectionRange(cursorPos, cursorPos);
+      setCaretIndex(cursorPos);
+    } else {
+      setCaretIndex(item.query.fullText.length);
+    }
+  }, []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedUpdateQuery = useCallback(
@@ -289,18 +331,27 @@ function SearchBar({
       ? Math.floor((0.7 * menuMaxHeight) / resultItemHeight)
       : 10;
 
-  const caretPosition = inputElement.current?.selectionStart || liveQuery.length;
   const items = useMemo(
     () =>
       autocompleter(
-        liveQuery,
-        caretPosition,
+        liveQueryLive,
+        caretIndex,
         recentSearches,
         /* includeArmory */ Boolean(mainSearchBar),
         maxResults,
       ),
-    [autocompleter, caretPosition, liveQuery, mainSearchBar, recentSearches, maxResults],
+    [autocompleter, caretIndex, liveQueryLive, mainSearchBar, recentSearches, maxResults],
   );
+
+  const filterTabTargets = useMemo(
+    () =>
+      items.filter(
+        (s) => s.type === SearchItemType.Autocomplete && s.query.fullText !== liveQueryLive,
+      ),
+    [items, liveQueryLive],
+  );
+
+  const tabHintItem = filterTabTargets[0];
 
   // useCombobox from Downshift manages the state of the dropdown
   const {
@@ -316,9 +367,9 @@ function SearchBar({
   } = useCombobox<SearchItem>({
     items,
     stateReducer,
-    initialInputValue: liveQuery,
+    initialInputValue: liveQueryLive,
     initialIsOpen: isPhonePortrait && mainSearchBar,
-    defaultHighlightedIndex: liveQuery ? 0 : -1,
+    defaultHighlightedIndex: liveQueryLive ? 0 : -1,
     itemToString: (i) => i?.query.fullText || '',
     onInputValueChange: ({ inputValue, type }) => {
       setLiveQuery(inputValue || '');
@@ -368,6 +419,7 @@ function SearchBar({
   useEffect(() => {
     if (searchQuery !== undefined && (searchQueryVersion || 0) > 0) {
       setInputValue(searchQuery);
+      setCaretIndex((searchQuery ?? '').length);
     }
     // This should only happen when the query version changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -405,25 +457,54 @@ function SearchBar({
     [clearFilter],
   );
 
-  // Implement tab completion on the tab key. If the highlighted item is an autocomplete suggestion,
-  // accept it. Otherwise, we scan from the beginning to find the first autocomplete suggestion and
-  // accept that. If there's nothing to accept, the tab key does its normal thing, which is to switch
-  // focus. The tabAutocompleteItem is computed as part of render so we can offer keyboard help.
-  const tabAutocompleteItem =
-    highlightedIndex > 0 && items[highlightedIndex]?.type === SearchItemType.Autocomplete
-      ? items[highlightedIndex]
-      : items.find((s) => s.type === SearchItemType.Autocomplete && s.query.fullText !== liveQuery);
+  // Tab: complete filter names; after `keyword:`, Tab cycles the next value (Shift+Tab goes back).
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Tab' && !e.altKey && !e.ctrlKey && tabAutocompleteItem && isOpen) {
-      e.preventDefault();
-      if (inputElement.current) {
-        // Use execCommand to make the insertion as if the user typed it, so it can be undone with Ctrl-Z
-        inputElement.current.setSelectionRange(0, inputElement.current.value.length);
-        document.execCommand('insertText', false, tabAutocompleteItem.query.fullText);
-        if (tabAutocompleteItem.highlightRange) {
-          const cursorPos = tabAutocompleteItem.highlightRange.range[1];
-          inputElement.current.setSelectionRange(cursorPos, cursorPos);
+    if (e.key === 'Tab' && !e.altKey && !e.ctrlKey && isOpen) {
+      const filterRows = items.filter(
+        (s) => s.type === SearchItemType.Autocomplete && s.query.fullText !== liveQueryLive,
+      );
+      if (filterRows.length > 0) {
+        const highlighted =
+          highlightedIndex >= 0 &&
+          items[highlightedIndex]?.type === SearchItemType.Autocomplete &&
+          items[highlightedIndex].query.fullText !== liveQueryLive
+            ? items[highlightedIndex]
+            : undefined;
+
+        const termInfo = resolveTermForAutocomplete(liveQueryLive, caretIndex, filterComplete);
+        const valueMode = Boolean(
+          termInfo &&
+          (searchType === SearchType.Loadout
+            ? isValueTabCycleMode(termInfo.term, loadoutSearchCfg)
+            : isValueTabCycleMode(termInfo.term, itemSearchConfig)),
+        );
+
+        if (highlighted) {
+          e.preventDefault();
+          applyAutocompleteItem(highlighted);
+          valueCycleRef.current = { key: '', nextIndex: 0 };
+          return;
         }
+
+        if (valueMode && termInfo) {
+          e.preventDefault();
+          const key = termInfo.term;
+          if (key !== valueCycleRef.current.key) {
+            valueCycleRef.current = { key, nextIndex: 0 };
+          }
+          const n = filterRows.length;
+          const idx = e.shiftKey
+            ? (valueCycleRef.current.nextIndex - 1 + n) % n
+            : valueCycleRef.current.nextIndex % n;
+          applyAutocompleteItem(filterRows[idx]);
+          valueCycleRef.current = { key, nextIndex: idx + 1 };
+          return;
+        }
+
+        e.preventDefault();
+        applyAutocompleteItem(filterRows[0]);
+        valueCycleRef.current = { key: '', nextIndex: 0 };
+        return;
       }
     } else if (e.key === 'Home' || e.key === 'End') {
       // Disable the use of Home/End to select items in the menu
@@ -472,7 +553,7 @@ function SearchBar({
                 highlighted={highlightedIndex === index}
                 item={item}
                 isPhonePortrait={isPhonePortrait}
-                isTabAutocompleteItem={item === tabAutocompleteItem}
+                isTabAutocompleteItem={item === tabHintItem}
                 onClick={deleteSearch}
               />
             </li>
@@ -487,7 +568,7 @@ function SearchBar({
       isOpen,
       isPhonePortrait,
       items,
-      tabAutocompleteItem,
+      tabHintItem,
       menuMaxHeight,
     ],
   );
@@ -502,6 +583,9 @@ function SearchBar({
         <input
           {...getInputProps({
             onBlur,
+            onClick: syncCaretFromInput,
+            onSelect: syncCaretFromInput,
+            onKeyUp: syncCaretFromInput,
             onKeyDown,
             ref: inputElement,
             className: clsx({ [styles.invalid]: !valid }),
