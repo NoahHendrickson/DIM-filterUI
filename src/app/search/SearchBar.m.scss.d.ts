@@ -23,6 +23,7 @@ interface CssExports {
   'textHighlight': string;
   'whisperBackdrop': string;
   'whisperHint': string;
+  'whisperKeyHelp': string;
   'whisperMatch': string;
 }
 export const cssExports: CssExports;
