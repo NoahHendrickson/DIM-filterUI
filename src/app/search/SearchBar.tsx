@@ -323,6 +323,14 @@ function SearchBar({
       ? ghostCandidates[ghostCycleIndex % ghostCandidates.length]
       : undefined;
 
+  // We're at the "value stage" when the current term being completed already contains a colon
+  // (i.e., the user has selected a filter identifier and is now choosing a value). Shift+Tab
+  // cycling — and its inline hint — only apply here; at the keyword stage there's typically
+  // just one keyword extension to accept with Tab and nothing meaningful to cycle through.
+  const isAtValueStage =
+    activeGhost?.item.highlightRange !== undefined &&
+    liveQuery.slice(activeGhost.item.highlightRange.range[0]).includes(':');
+
   // Reset cycle index whenever the typed query changes (typing, Tab acceptance, programmatic reset).
   // Shift+Tab cycling does not change liveQuery, so the index persists across cycles.
   useEffect(() => {
@@ -452,6 +460,7 @@ function SearchBar({
       e.shiftKey &&
       !e.altKey &&
       !e.ctrlKey &&
+      isAtValueStage &&
       activeGhost &&
       ghostCandidates.length > 1
     ) {
@@ -573,7 +582,13 @@ function SearchBar({
             <div className={styles.ghostOverlay} aria-hidden>
               <span className={styles.ghostMirror}>{liveQuery}</span>
               <span className={styles.ghostText}>{activeGhost.suffix}</span>
-              <KeyHelp combo="tab" />
+              <KeyHelp combo="tab" className={styles.ghostKey} />
+              {isAtValueStage && ghostCandidates.length > 1 && (
+                <>
+                  <KeyHelp combo="shift+tab" className={styles.ghostKey} />
+                  <span className={styles.ghostHint}>{t('Header.CycleSuggestion')}</span>
+                </>
+              )}
             </div>
           )}
         </div>

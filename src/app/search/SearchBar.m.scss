@@ -31,10 +31,14 @@
 
 // Faded inline suggestion that appears at the caret. Sits over the input but ignores all pointer
 // input. The mirror span is rendered invisibly so the visible suffix lines up with the caret.
+// Flex with align-items: center keeps the chips visually centered with the typed/ghost text
+// regardless of the chip's smaller font size (which would otherwise baseline-align low).
 .ghostOverlay {
   position: absolute;
   inset: 0;
   padding: 7px 0;
+  display: flex;
+  align-items: center;
   pointer-events: none;
   white-space: pre;
   overflow: hidden;
@@ -53,6 +57,26 @@
 
 .ghostText {
   opacity: 0.4;
+}
+
+// Override the default KeyHelp chip so it visually matches the faded ghost text.
+// Use a descendant selector under .ghostOverlay to win specificity over the global .keyHelp rule
+// regardless of CSS module load order.
+.ghostOverlay .ghostKey {
+  font-size: 9px;
+  padding: 0 3px;
+  color: var(--theme-text);
+  border-color: var(--theme-text);
+  opacity: 0.4;
+}
+
+// Small label that follows the Shift+Tab chip and tells the user what cycling does.
+.ghostHint {
+  margin-left: 4px;
+  font-size: 11px;
+  opacity: 0.4;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .open {

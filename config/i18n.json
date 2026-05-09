@@ -405,6 +405,7 @@
     "Clear": "Clear search filter",
     "TagAs": "Tag as '{{tag}}'",
     "CompareMatching": "Compare Items",
+    "CycleSuggestion": "to cycle",
     "DeleteSearch": "Delete Search",
     "FilterHelp": "Search item/perk, {{example}}, and more",
     "FilterHelpBrief": "Search items",
