@@ -41,6 +41,13 @@ exports[`filterComplete autocomplete terms for |ote| 1`] = `
 ]
 `;
 
+exports[`filterComplete autocomplete terms for |setb| 1`] = `
+[
+  "setbonus:",
+  "dupe:setbonus+statlower",
+]
+`;
+
 exports[`filterComplete autocomplete terms for |sni| 1`] = `
 [
   "is:sniperrifle",

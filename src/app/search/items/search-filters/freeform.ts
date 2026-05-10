@@ -103,6 +103,38 @@ const freeformFilters: ItemFilterDefinition[] = [
     },
   },
   {
+    keywords: 'setbonus',
+    description: tl('Filter.SetBonus'),
+    format: 'freeform',
+    destinyVersion: 2,
+    suggestionsGenerator: ({ d2Definitions }) => {
+      // Always emit the bare `setbonus:` keyword so it autocompletes even when
+      // manifest data hasn't loaded yet.
+      if (!d2Definitions) {
+        return ['setbonus:'];
+      }
+      const setBonusNames = new Set<string>();
+      for (const setBonus of Object.values(d2Definitions.EquipableItemSet.getAll())) {
+        if (setBonus.redacted) {
+          continue;
+        }
+        const name = setBonus.displayProperties.name;
+        if (name) {
+          setBonusNames.add(name.toLowerCase());
+        }
+      }
+      // Always wrap names in double quotes — even single-word ones — so cycling
+      // through values via Shift+Tab keeps a consistent format and doesn't
+      // alternate between quoted and unquoted forms based on whether a given
+      // name happens to contain spaces.
+      return ['setbonus:', ...Array.from(setBonusNames, (n) => `setbonus:"${n}"`)];
+    },
+    filter: ({ filterValue, language }) => {
+      const test = matchText(filterValue, language, /* exact */ false);
+      return (item) => Boolean(item.setBonus && test(item.setBonus.displayProperties.name));
+    },
+  },
+  {
     keywords: 'perk',
     description: tl('Filter.Perk'),
     format: 'freeform',

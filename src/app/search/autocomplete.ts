@@ -65,9 +65,10 @@ export type SearchItem =
  * Returns the suffix text to render as ghost text, or null when the suggestion is not a clean extension
  * of what the user has typed (for example because it would replace earlier characters via fuzzy match).
  *
- * Only `Autocomplete`-type items qualify. The suggestion's `fullText` must be a strict prefix-extension
- * of the typed query (case-insensitive), and the caret must be at the end of the input. Anything else
- * still surfaces in the dropdown but is not safe to render as a clean inline ghost.
+ * Only `Autocomplete`-type items qualify. The suggestion's `fullText` must extend the typed query
+ * (case-insensitive), with one exception: a freeform `keyword:"value"` suggestion can also match
+ * unquoted typed input like `keyword:value` — Tab acceptance still inserts the quoted form, but the
+ * ghost suffix is computed against the unquoted shape so the user sees what's still missing.
  */
 export function getGhostSuffix(
   typedQuery: string,
@@ -85,11 +86,52 @@ export function getGhostSuffix(
   if (fullText.length <= typedQuery.length) {
     return null;
   }
-  // Suggestion must strictly extend what's typed. Compared case-insensitively to tolerate user casing.
-  if (fullText.substring(0, typedQuery.length).toLowerCase() !== typedQuery.toLowerCase()) {
-    return null;
+  const typedLower = typedQuery.toLowerCase();
+  // Strict prefix: suggestion literally starts with what's typed.
+  if (fullText.substring(0, typedQuery.length).toLowerCase() === typedLower) {
+    return fullText.substring(typedQuery.length);
   }
-  return fullText.substring(typedQuery.length);
+  // Freeform fallback: if the suggestion is shaped like `<prefix>:"<value>"` and the typed query
+  // matches the unquoted form (`<prefix>:<partial>`), render the missing tail as ghost text.
+  // Tab acceptance still inserts the full quoted suggestion via the dropdown's tab handler.
+  const unquoted = fullText.replace(/^([^:\s"]+:)"([^"]*)"$/, '$1$2');
+  if (
+    unquoted !== fullText &&
+    unquoted.length > typedQuery.length &&
+    unquoted.substring(0, typedQuery.length).toLowerCase() === typedLower
+  ) {
+    return unquoted.substring(typedQuery.length);
+  }
+  return null;
+}
+
+/**
+ * Walk back from `caretIndex` to find the start of the current term — the boundary at the
+ * previous whitespace or open paren, treating balanced quoted regions as a single unit so
+ * multi-word values like `setbonus:"wayward psyche set"` aren't split on the inner spaces.
+ */
+export function findTermStart(query: string, caretIndex: number): number {
+  let i = caretIndex - 1;
+  while (i >= 0) {
+    const ch = query[i];
+    if (ch === '"' || ch === "'") {
+      // Skip the entire quoted region back to the matching opening quote (or fall off
+      // the start of the string if it's unmatched). Either way, jump past it and keep
+      // scanning for the term boundary.
+      const quote = ch;
+      i--;
+      while (i >= 0 && query[i] !== quote) {
+        i--;
+      }
+      i--;
+      continue;
+    }
+    if (ch === ' ' || ch === '\t' || ch === '(' || ch === ')') {
+      return i + 1;
+    }
+    i--;
+  }
+  return 0;
 }
 
 /** matches a keyword that's probably a math comparison, but not with a value on the RHS */
@@ -408,13 +450,16 @@ export function makeFilterComplete<I, FilterCtx, SuggestionsCtx>(
   const multiqueryTermsLookup: NodeJS.Dict<string[]> = {};
   for (const filter of Object.values(searchConfig.filtersMap.kvFilters)) {
     const formats = canonicalFilterFormats(filter.format);
+    // `keywords` can be a single string or an array; normalize so we iterate over keywords
+    // rather than over the characters of a single string keyword.
+    const keywords = Array.isArray(filter.keywords) ? filter.keywords : [filter.keywords];
     if (formats.includes('freeform')) {
-      for (const k of filter.keywords) {
+      for (const k of keywords) {
         freeformTerms.push(`${k}:`);
       }
     }
     if (formats.includes('multiquery')) {
-      for (const k of filter.keywords) {
+      for (const k of keywords) {
         (multiqueryTermsLookup[k] ??= []).push(...(filter.suggestions ?? []));
       }
     }

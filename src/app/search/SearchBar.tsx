@@ -52,6 +52,7 @@ import { buildArmoryIndex } from './armory-search';
 import createAutocompleter, {
   SearchItem,
   SearchItemType,
+  findTermStart,
   getGhostSuffix,
   makeFilterComplete,
 } from './autocomplete';
@@ -338,18 +339,12 @@ function SearchBar({
       ? ghostCandidates[ghostCycleIndex % ghostCandidates.length]
       : undefined;
 
-  // Find the start of the current term in the typed query (walk back to the last whitespace or
-  // open-paren). This is the position we keep stable when swapping in alternate values.
-  const termStart = useMemo(() => {
-    let start = 0;
-    for (let i = caretPosition - 1; i >= 0; i--) {
-      if (/[\s()]/.test(liveQuery[i])) {
-        start = i + 1;
-        break;
-      }
-    }
-    return start;
-  }, [liveQuery, caretPosition]);
+  // Find the start of the current term in the typed query.
+  // This is the position we keep stable when swapping in alternate values.
+  const termStart = useMemo(
+    () => findTermStart(liveQuery, caretPosition),
+    [liveQuery, caretPosition],
+  );
 
   // The current term's filter prefix (e.g. `tunedstat:`), or null if no colon has been typed yet.
   // When non-null, the user has selected an identifier and we can offer value cycling.
