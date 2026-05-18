@@ -16,6 +16,18 @@ import { ItemCategoryHashes, PlugCategoryHashes } from 'data/d2/generated-enums'
 import memoizeOne from 'memoize-one';
 import { ItemFilterDefinition } from '../item-filter-types';
 
+/**
+ * Build always-quoted `keyword:"value"` suggestions plus a bare `keyword:` for filters
+ * that want consistent Shift+Tab cycling. Always quoting — even single-word values —
+ * keeps cycled output visually stable instead of flickering between `keyword:foo` and
+ * `keyword:"foo bar"` as the user pages through values. Any filter that returns its
+ * suggestions through this helper automatically picks up ghost-text autocomplete, Tab
+ * acceptance, and Shift+Tab cycling — see getGhostSuffix in autocomplete.ts.
+ */
+function quotedSuggestionsFor(keyword: string, values: Iterable<string>): string[] {
+  return [`${keyword}:`, ...Array.from(values, (v) => `${keyword}:"${v}"`)];
+}
+
 const interestingPlugTypes = new Set([PlugCategoryHashes.Frames, PlugCategoryHashes.Intrinsics]);
 const getPerkNamesFromManifest = memoizeOne(
   (allItems: { [hash: number]: DestinyInventoryItemDefinition }) =>
@@ -123,11 +135,7 @@ const freeformFilters: ItemFilterDefinition[] = [
           setBonusNames.add(name.toLowerCase());
         }
       }
-      // Always wrap names in double quotes — even single-word ones — so cycling
-      // through values via Shift+Tab keeps a consistent format and doesn't
-      // alternate between quoted and unquoted forms based on whether a given
-      // name happens to contain spaces.
-      return ['setbonus:', ...Array.from(setBonusNames, (n) => `setbonus:"${n}"`)];
+      return quotedSuggestionsFor('setbonus', setBonusNames);
     },
     filter: ({ filterValue, language }) => {
       const test = matchText(filterValue, language, /* exact */ false);
@@ -188,7 +196,7 @@ const freeformFilters: ItemFilterDefinition[] = [
           }
         }
 
-        return Array.from(perkNames, (s) => `exactperk:${quoteFilterString(s)}`);
+        return quotedSuggestionsFor('exactperk', perkNames);
       }
     },
     filter: ({ lhs, filterValue, language, d2Definitions }) => {

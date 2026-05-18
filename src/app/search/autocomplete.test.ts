@@ -373,6 +373,29 @@ describe('getGhostSuffix', () => {
       // Typed contains characters the suggestion's value doesn't have at that position.
       expect(getGhostSuffix('setbonus:zzz', 12, quoted('setbonus:"bushido"'))).toBeNull();
     });
+
+    // Parallel cases against a different always-quoted filter prove the unquoted/quoted
+    // ghost-suffix logic isn't tied to `setbonus:`. Any keyword that emits `keyword:"value"`
+    // suggestions gets the same treatment.
+    test('works the same way for `exactperk:` — single-word value', () => {
+      expect(getGhostSuffix('exactperk:out', 13, quoted('exactperk:"outlaw"'))).toBe('law');
+    });
+
+    test('works the same way for `exactperk:` — multi-word value across the inner space', () => {
+      expect(
+        getGhostSuffix('exactperk:explosive', 19, quoted('exactperk:"explosive payload"')),
+      ).toBe(' payload');
+    });
+
+    test('works the same way for `exactperk:` — start of a multi-word value', () => {
+      expect(getGhostSuffix('exactperk:exp', 13, quoted('exactperk:"explosive payload"'))).toBe(
+        'losive payload',
+      );
+    });
+
+    test('works the same way for `exactperk:` — typed opening quote (strict prefix)', () => {
+      expect(getGhostSuffix('exactperk:"out', 14, quoted('exactperk:"outlaw"'))).toBe('law"');
+    });
   });
 
   describe('unquoted multi-word setbonus value autocompletes to the quoted form', () => {
