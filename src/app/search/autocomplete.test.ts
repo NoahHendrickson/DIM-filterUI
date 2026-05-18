@@ -1,8 +1,13 @@
 import { Search, SearchType } from '@destinyitemmanager/dim-api-types';
+import { D2ManifestDefinitions } from 'app/destiny2/d2-definitions';
 import {
   autocompleteTermSuggestions,
   filterSortRecentSearches,
+  findTermStart,
+  getGhostSuffix,
   makeFilterComplete,
+  SearchItem,
+  SearchItemType,
 } from './autocomplete';
 import { buildItemSearchConfig } from './items/item-search-filter';
 import { quoteFilterString } from './query-parser';
@@ -230,10 +235,242 @@ describe('filterComplete', () => {
   const searchConfig = buildItemSearchConfig(2, 'en');
   const filterComplete = makeFilterComplete(searchConfig);
 
-  const terms = [['is:b'], ['jun'], ['sni'], ['stat:mob'], ['stat'], ['stat:'], ['ote']];
+  const terms = [
+    ['is:b'],
+    ['jun'],
+    ['sni'],
+    ['stat:mob'],
+    ['stat'],
+    ['stat:'],
+    ['ote'],
+    // Typing the value of a multiquery filter (like a `dupe:` sub-type) should
+    // surface the standalone `dupe:setbonus` suggestion, not just the
+    // compound `dupe:setbonus+statlower`.
+    ['setb'],
+  ];
 
   test.each(terms)('autocomplete terms for |%s|', (term) => {
     const candidates = filterComplete(term);
     expect(candidates).toMatchSnapshot();
+  });
+});
+
+describe('getGhostSuffix', () => {
+  // Builds a minimal Autocomplete SearchItem stand-in without going through the search config.
+  const autocompleteItem = (fullText: string, range?: [number, number]): SearchItem => ({
+    type: SearchItemType.Autocomplete,
+    query: { fullText, body: fullText },
+    highlightRange: range ? { section: 'body', range } : undefined,
+  });
+
+  test('returns the suffix when the suggestion strictly extends typed text at end of input (key stage)', () => {
+    const item = autocompleteItem('tunedstat:', [0, 10]);
+    expect(getGhostSuffix('tu', 2, item)).toBe('nedstat:');
+  });
+
+  test('returns the suffix at the value stage after the colon', () => {
+    const item = autocompleteItem('tunedstat:weapon', [0, 16]);
+    expect(getGhostSuffix('tunedstat:', 10, item)).toBe('weapon');
+  });
+
+  test('returns the suffix when typing the start of a value', () => {
+    const item = autocompleteItem('season:>outlaw', [0, 14]);
+    expect(getGhostSuffix('season:>outl', 12, item)).toBe('aw');
+  });
+
+  test('returns the suffix when extending later in a multi-clause query', () => {
+    const item = autocompleteItem('is:haspower is:bow', [12, 18]);
+    expect(getGhostSuffix('is:haspower is:b', 16, item)).toBe('ow');
+  });
+
+  test('matches case-insensitively for the typed prefix', () => {
+    const item = autocompleteItem('tunedstat:', [0, 10]);
+    expect(getGhostSuffix('TU', 2, item)).toBe('nedstat:');
+  });
+
+  test('returns null when the suggestion would replace earlier characters (fuzzy / multi-word)', () => {
+    // The freeform multi-word case wraps user input in name:"..." which does not extend the typed text
+    const item = autocompleteItem('name:"arctic haze"', [0, 18]);
+    expect(getGhostSuffix('arctic haz', 10, item)).toBeNull();
+  });
+
+  test('returns null when the suggestion replaces a fuzzy mid-term match', () => {
+    // "(is:blue ju" -> "(is:blue tag:junk" replaces "ju" with "tag:junk"; not a strict extension
+    const item = autocompleteItem('(is:blue tag:junk', [9, 17]);
+    expect(getGhostSuffix('(is:blue ju', 11, item)).toBeNull();
+  });
+
+  test('returns null when the caret is not at the end of input', () => {
+    const item = autocompleteItem('tunedstat:', [0, 10]);
+    expect(getGhostSuffix('tu baz', 2, item)).toBeNull();
+  });
+
+  test('returns null when the suggestion has the same text as typed (the self-echo queryItem)', () => {
+    const item = autocompleteItem('tu');
+    expect(getGhostSuffix('tu', 2, item)).toBeNull();
+  });
+
+  test('returns null for non-Autocomplete item types', () => {
+    const recent: SearchItem = {
+      type: SearchItemType.Recent,
+      query: { fullText: 'tunedstat:weapon', body: 'tunedstat:weapon' },
+    };
+    expect(getGhostSuffix('tu', 2, recent)).toBeNull();
+  });
+
+  test('feeds end-to-end from autocompleteTermSuggestions: tu -> tunedstat: ghost is "nedstat:"', () => {
+    const searchConfig = buildItemSearchConfig(2, 'en');
+    const filterComplete = makeFilterComplete(searchConfig);
+    const candidates = autocompleteTermSuggestions('tu', 2, filterComplete, searchConfig);
+    expect(candidates.length).toBeGreaterThan(0);
+    const top = candidates[0];
+    expect(top.query.fullText).toBe('tunedstat:');
+    expect(getGhostSuffix('tu', 2, top)).toBe('nedstat:');
+  });
+
+  test('feeds end-to-end from autocompleteTermSuggestions: setb -> setbonus: ghost is "onus:"', () => {
+    const searchConfig = buildItemSearchConfig(2, 'en');
+    const filterComplete = makeFilterComplete(searchConfig);
+    const candidates = autocompleteTermSuggestions('setb', 4, filterComplete, searchConfig);
+    expect(candidates.length).toBeGreaterThan(0);
+    const top = candidates[0];
+    expect(top.query.fullText).toBe('setbonus:');
+    expect(getGhostSuffix('setb', 4, top)).toBe('onus:');
+  });
+
+  describe('unquoted-typed against a `keyword:"value"` suggestion', () => {
+    const quoted = (fullText: string): SearchItem => ({
+      type: SearchItemType.Autocomplete,
+      query: { fullText, body: fullText },
+      highlightRange: { section: 'body', range: [0, fullText.length] },
+    });
+
+    test('returns the missing tail when the user typed the value unquoted, single-word case', () => {
+      // Typed: setbonus:bus  Suggestion: setbonus:"bushido"  -> ghost is `hido`
+      expect(getGhostSuffix('setbonus:bus', 12, quoted('setbonus:"bushido"'))).toBe('hido');
+    });
+
+    test('returns the missing tail across spaces in a multi-word value', () => {
+      // Typed: setbonus:wayward psyche  Suggestion: setbonus:"wayward psyche set"  -> ` set`
+      expect(
+        getGhostSuffix('setbonus:wayward psyche', 23, quoted('setbonus:"wayward psyche set"')),
+      ).toBe(' set');
+    });
+
+    test('matches even when the user types the start of a multi-word value', () => {
+      expect(getGhostSuffix('setbonus:way', 12, quoted('setbonus:"wayward psyche set"'))).toBe(
+        'ward psyche set',
+      );
+    });
+
+    test('still works when the user types with the opening quote (strict prefix path)', () => {
+      expect(getGhostSuffix('setbonus:"way', 13, quoted('setbonus:"wayward psyche set"'))).toBe(
+        'ward psyche set"',
+      );
+    });
+
+    test('returns null when the unquoted form does not extend the typed text', () => {
+      // Typed contains characters the suggestion's value doesn't have at that position.
+      expect(getGhostSuffix('setbonus:zzz', 12, quoted('setbonus:"bushido"'))).toBeNull();
+    });
+
+    // Parallel cases against a different always-quoted filter prove the unquoted/quoted
+    // ghost-suffix logic isn't tied to `setbonus:`. Any keyword that emits `keyword:"value"`
+    // suggestions gets the same treatment.
+    test('works the same way for `exactperk:` — single-word value', () => {
+      expect(getGhostSuffix('exactperk:out', 13, quoted('exactperk:"outlaw"'))).toBe('law');
+    });
+
+    test('works the same way for `exactperk:` — multi-word value across the inner space', () => {
+      expect(
+        getGhostSuffix('exactperk:explosive', 19, quoted('exactperk:"explosive payload"')),
+      ).toBe(' payload');
+    });
+
+    test('works the same way for `exactperk:` — start of a multi-word value', () => {
+      expect(getGhostSuffix('exactperk:exp', 13, quoted('exactperk:"explosive payload"'))).toBe(
+        'losive payload',
+      );
+    });
+
+    test('works the same way for `exactperk:` — typed opening quote (strict prefix)', () => {
+      expect(getGhostSuffix('exactperk:"out', 14, quoted('exactperk:"outlaw"'))).toBe('law"');
+    });
+  });
+
+  describe('unquoted multi-word setbonus value autocompletes to the quoted form', () => {
+    // Minimal stub of just the manifest tables the setbonus filter consults.
+    const fakeDefs = {
+      EquipableItemSet: {
+        getAll: () => ({
+          1: {
+            hash: 1,
+            displayProperties: { name: 'Wayward Psyche Set' },
+            setPerks: [],
+            redacted: false,
+          },
+          2: {
+            hash: 2,
+            displayProperties: { name: 'Bushido' },
+            setPerks: [],
+            redacted: false,
+          },
+        }),
+      },
+    } as unknown as D2ManifestDefinitions;
+    const searchConfig = buildItemSearchConfig(2, 'en', { d2Definitions: fakeDefs });
+    const filterComplete = makeFilterComplete(searchConfig);
+
+    const cases: [typed: string, expectedTopFullText: string][] = [
+      ['setbonus:way', 'setbonus:"wayward psyche set"'],
+      ['setbonus:wayward', 'setbonus:"wayward psyche set"'],
+      ['setbonus:wayward psyche', 'setbonus:"wayward psyche set"'],
+    ];
+
+    test.each(cases)('typing %s suggests %s as the top option', (typed, expected) => {
+      const candidates = autocompleteTermSuggestions(
+        typed,
+        typed.length,
+        filterComplete,
+        searchConfig,
+      );
+      expect(candidates[0]?.query.fullText).toBe(expected);
+    });
+  });
+});
+
+describe('findTermStart', () => {
+  // Cases use "|" as a caret placeholder. The expected number is the index where the
+  // current term starts (i.e. the value `findTermStart` should return).
+  const cases: [scenario: string, queryWithCaret: string, expectedStart: number][] = [
+    ['empty query', '|', 0],
+    ['caret at end of single bare word', 'is:exotic|', 0],
+    ['caret in middle of single bare word', 'is:exo|tic', 0],
+    ['after first word, second term starts after the space', 'is:exotic name|', 10],
+    ['inside the second term', 'is:exotic na|me', 10],
+    ['caret at end of single-word quoted value', 'name:"foo"|', 0],
+    [
+      'caret at end of multi-word quoted value (regression: cycling stays engaged here)',
+      'setbonus:"wayward psyche set"|',
+      0,
+    ],
+    [
+      'caret at end of multi-word quoted value preceded by another filter',
+      'is:exotic setbonus:"wayward psyche set"|',
+      10,
+    ],
+    ['caret at end of single-quoted multi-word value', "setbonus:'wayward psyche set'|", 0],
+    ['unclosed opening quote falls off the start of the string', 'setbonus:"col|', 0],
+    ['caret right after open paren starts a new term', '(|', 1],
+    [
+      'caret in nested group with quoted multi-word value',
+      '(is:exotic or setbonus:"wayward psyche set"|)',
+      14,
+    ],
+  ];
+
+  test.each(cases)('%s', (_scenario, queryWithCaret, expectedStart) => {
+    const [caretIndex, query] = extractCaret(queryWithCaret);
+    expect(findTermStart(query, caretIndex)).toBe(expectedStart);
   });
 });

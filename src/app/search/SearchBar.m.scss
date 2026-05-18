@@ -5,6 +5,80 @@
   font-size: 13px;
 }
 
+// Wraps the <input> so the inline ghost-text overlay can be absolutely positioned over it
+// without interfering with the search-filter's flex layout.
+.inputWrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+// The wrap replaces the input as the direct flex child of .search-filter, so the existing
+// `.search-filter > input[type='text']` rule no longer applies. We re-declare equivalent
+// styling here, scoped to inputs inside the wrap.
+.inputWrap > input[type='text'] {
+  all: initial;
+  outline: none;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 0;
+  font-size: inherit;
+  font-family: inherit;
+  color: inherit;
+  caret-color: var(--theme-accent-primary);
+}
+
+// Faded inline suggestion that appears at the caret. Sits over the input but ignores all pointer
+// input. The mirror span is rendered invisibly so the visible suffix lines up with the caret.
+// Flex with align-items: center keeps the chips visually centered with the typed/ghost text
+// regardless of the chip's smaller font size (which would otherwise baseline-align low).
+.ghostOverlay {
+  position: absolute;
+  inset: 0;
+  padding: 7px 0;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  white-space: pre;
+  overflow: hidden;
+  font-size: inherit;
+  font-family: inherit;
+  color: var(--theme-text);
+
+  @include phone-portrait {
+    display: none;
+  }
+}
+
+.ghostMirror {
+  visibility: hidden;
+}
+
+.ghostText {
+  opacity: 0.4;
+}
+
+// Override the default KeyHelp chip so it visually matches the faded ghost text.
+// Use a descendant selector under .ghostOverlay to win specificity over the global .keyHelp rule
+// regardless of CSS module load order.
+.ghostOverlay .ghostKey {
+  font-size: 9px;
+  padding: 0 3px;
+  color: var(--theme-text);
+  border-color: var(--theme-text);
+  opacity: 0.4;
+}
+
+// Small label that follows the Shift+Tab chip and tells the user what cycling does.
+.ghostHint {
+  margin-left: 4px;
+  font-size: 11px;
+  opacity: 0.4;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .open {
   border-bottom-left-radius: 0 !important;
   border-bottom-right-radius: 0 !important;

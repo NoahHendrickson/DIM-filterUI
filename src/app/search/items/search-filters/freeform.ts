@@ -16,6 +16,18 @@ import { ItemCategoryHashes, PlugCategoryHashes } from 'data/d2/generated-enums'
 import memoizeOne from 'memoize-one';
 import { ItemFilterDefinition } from '../item-filter-types';
 
+/**
+ * Build always-quoted `keyword:"value"` suggestions plus a bare `keyword:` for filters
+ * that want consistent Shift+Tab cycling. Always quoting — even single-word values —
+ * keeps cycled output visually stable instead of flickering between `keyword:foo` and
+ * `keyword:"foo bar"` as the user pages through values. Any filter that returns its
+ * suggestions through this helper automatically picks up ghost-text autocomplete, Tab
+ * acceptance, and Shift+Tab cycling — see getGhostSuffix in autocomplete.ts.
+ */
+function quotedSuggestionsFor(keyword: string, values: Iterable<string>): string[] {
+  return [`${keyword}:`, ...Array.from(values, (v) => `${keyword}:"${v}"`)];
+}
+
 const interestingPlugTypes = new Set([PlugCategoryHashes.Frames, PlugCategoryHashes.Intrinsics]);
 const getPerkNamesFromManifest = memoizeOne(
   (allItems: { [hash: number]: DestinyInventoryItemDefinition }) =>
@@ -103,6 +115,34 @@ const freeformFilters: ItemFilterDefinition[] = [
     },
   },
   {
+    keywords: 'setbonus',
+    description: tl('Filter.SetBonus'),
+    format: 'freeform',
+    destinyVersion: 2,
+    suggestionsGenerator: ({ d2Definitions }) => {
+      // Always emit the bare `setbonus:` keyword so it autocompletes even when
+      // manifest data hasn't loaded yet.
+      if (!d2Definitions) {
+        return ['setbonus:'];
+      }
+      const setBonusNames = new Set<string>();
+      for (const setBonus of Object.values(d2Definitions.EquipableItemSet.getAll())) {
+        if (setBonus.redacted) {
+          continue;
+        }
+        const name = setBonus.displayProperties.name;
+        if (name) {
+          setBonusNames.add(name.toLowerCase());
+        }
+      }
+      return quotedSuggestionsFor('setbonus', setBonusNames);
+    },
+    filter: ({ filterValue, language }) => {
+      const test = matchText(filterValue, language, /* exact */ false);
+      return (item) => Boolean(item.setBonus && test(item.setBonus.displayProperties.name));
+    },
+  },
+  {
     keywords: 'perk',
     description: tl('Filter.Perk'),
     format: 'freeform',
@@ -156,7 +196,7 @@ const freeformFilters: ItemFilterDefinition[] = [
           }
         }
 
-        return Array.from(perkNames, (s) => `exactperk:${quoteFilterString(s)}`);
+        return quotedSuggestionsFor('exactperk', perkNames);
       }
     },
     filter: ({ lhs, filterValue, language, d2Definitions }) => {

@@ -5,7 +5,13 @@ interface CssExports {
   'deleteIcon': string;
   'filterBarButton': string;
   'filterHelp': string;
+  'ghostHint': string;
+  'ghostKey': string;
+  'ghostMirror': string;
+  'ghostOverlay': string;
+  'ghostText': string;
   'highlightedItem': string;
+  'inputWrap': string;
   'invalid': string;
   'keyHelp': string;
   'menu': string;
