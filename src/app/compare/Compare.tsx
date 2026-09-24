@@ -3,13 +3,15 @@ import { languageSelector } from 'app/dim-api/selectors';
 import Select, { Option } from 'app/dim-ui/Select';
 import { useTableColumnSorts } from 'app/dim-ui/table-columns';
 import { t } from 'app/i18next-t';
+import { bulkTagItems } from 'app/inventory/bulk-actions';
 import { locateItem } from 'app/inventory/locate-item';
-import { createItemContextSelector } from 'app/inventory/selectors';
+import { createItemContextSelector, getTagSelector } from 'app/inventory/selectors';
 import { ItemCreationContext } from 'app/inventory/store/d2-item-factory';
 import {
   applySocketOverrides,
   useSocketOverridesForItems,
 } from 'app/inventory/store/override-sockets';
+import { HighlightedPerksContext } from 'app/item-popup/highlighted-perks';
 import { useD2Definitions } from 'app/manifest/selectors';
 import { showNotification } from 'app/notifications/notifications';
 import { buildStatInfo } from 'app/organizer/Columns';
@@ -24,7 +26,8 @@ import { masterworkHammer } from 'app/shell/icons/custom/MasterworkHammer';
 import { acquisitionRecencyComparator } from 'app/shell/item-comparators';
 import { useThunkDispatch } from 'app/store/thunk-dispatch';
 import { compact } from 'app/utils/collections';
-import { emptyArray } from 'app/utils/empty';
+import { emptyArray, emptySet } from 'app/utils/empty';
+import clsx from 'clsx';
 import ModificationsIcon from 'destiny-icons/general/modifications.svg?react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
@@ -34,9 +37,20 @@ import { DimItem, DimSocket } from '../inventory/item-types';
 import { chainComparator, compareBy } from '../utils/comparators';
 import * as styles from './Compare.m.scss';
 import { getColumns } from './CompareColumns';
-import CompareItem, { CompareHeaders } from './CompareItem';
+import CompareItem, { CompareHeaders, PerkFinderStatus } from './CompareItem';
 import CompareSuggestions from './CompareSuggestions';
+import PerkFinder from './PerkFinder';
 import { endCompareSession, removeCompareItem, updateCompareQuery } from './actions';
+import {
+  PerkFinderResult,
+  PerkMatchMode,
+  PerkPriority,
+  buildPerkFinderColumns,
+  comparePerkFinderItems,
+  findPerkFinderResult,
+  getItemPerkColumns,
+  togglePick,
+} from './perk-finder';
 import { CompareSession } from './reducer';
 import { compareItemsSelector, compareOrganizerLinkSelector } from './selectors';
 
@@ -51,6 +65,7 @@ export default function Compare({ session }: { session: CompareSession }) {
   const [armorCompareSetting, setArmorCompareSetting] = useSetting('armorCompare');
   const [assumeWeaponMasterwork, setAssumeWeaponMasterwork] = useSetting('compareWeaponMasterwork');
   const itemCreationContext = useSelector(createItemContextSelector);
+  const getTag = useSelector(getTagSelector);
   const rawCompareItems = useSelector(compareItemsSelector(session.vendorCharacterId));
   const organizerLink = useSelector(compareOrganizerLinkSelector);
 
@@ -58,6 +73,12 @@ export default function Compare({ session }: { session: CompareSession }) {
   const [highlight, setHighlight] = useState<string | number>();
   const [socketOverrides, onPlugClicked] = useSocketOverridesForItems();
   const [columnSorts, toggleColumnSort] = useTableColumnSorts([]);
+  const [showPerkFinder, setShowPerkFinder] = useState(false);
+  /** Picked perks, most important first */
+  const [perkPriority, setPerkPriority] = useState<PerkPriority>([]);
+  /** Whether the user has turned on their own ranking, rather than using the default ranking */
+  const [perkRankingEnabled, setPerkRankingEnabled] = useState(false);
+  const [perkMatchMode, setPerkMatchMode] = useState<PerkMatchMode>('strict');
 
   const comparingArmor = rawCompareItems[0]?.bucket.inArmor;
   const comparingWeapons = rawCompareItems[0]?.bucket.inWeapons;
@@ -201,6 +222,80 @@ export default function Compare({ session }: { session: CompareSession }) {
 
   /* End ItemTable incursion */
 
+  /* Perk finder */
+
+  const perkFinderAvailable = Boolean(comparingWeapons && destinyVersion === 2);
+  const perkColumns = useMemo(
+    () => (perkFinderAvailable ? buildPerkFinderColumns(rawCompareItems, defs) : []),
+    [perkFinderAvailable, rawCompareItems, defs],
+  );
+  // Only count picks that are still offered by the items being compared
+  const activePriority = useMemo(
+    () =>
+      perkPriority.filter((pick) =>
+        perkColumns.some(
+          (c) => c.index === pick.column && c.options.some((o) => o.hash === pick.hash),
+        ),
+      ),
+    [perkPriority, perkColumns],
+  );
+  const perkResult = useMemo(
+    () =>
+      findPerkFinderResult(
+        rawCompareItems.map((item) => ({ id: item.id, columns: getItemPerkColumns(item) })),
+        activePriority,
+        perkMatchMode,
+        perkRankingEnabled,
+      ),
+    [rawCompareItems, activePriority, perkMatchMode, perkRankingEnabled],
+  );
+  const perkFinderActive = showPerkFinder && perkResult.pickedCount > 0;
+  const highlightedPerks = useMemo(
+    () =>
+      perkFinderActive ? new Set(activePriority.map((pick) => pick.hash)) : emptySet<number>(),
+    [perkFinderActive, activePriority],
+  );
+
+  const togglePerk = useCallback((column: number, hash: number) => {
+    setPerkPriority((priority) => togglePick(priority, { column, hash }));
+  }, []);
+  const clearPerks = useCallback(() => setPerkPriority([]), []);
+
+  // Owned guns that aren't needed for the picked perks. Skip ones the user has
+  // already said they want (or already junked).
+  const junkCandidates = useMemo(
+    () =>
+      perkFinderActive && perkResult.keep.size > 0
+        ? rawCompareItems.filter((item) => {
+            const tag = getTag(item);
+            return (
+              !perkResult.keep.has(item.id) &&
+              item.taggable &&
+              !item.vendor &&
+              tag !== 'favorite' &&
+              tag !== 'keep' &&
+              tag !== 'junk'
+            );
+          })
+        : emptyArray<DimItem>(),
+    [perkFinderActive, perkResult, rawCompareItems, getTag],
+  );
+  const tagOthersAsJunk = useCallback(
+    () => dispatch(bulkTagItems(junkCandidates, 'junk')),
+    [dispatch, junkCandidates],
+  );
+
+  // With perks picked, show the guns to keep first. See comparePerkFinderItems.
+  const orderedRows = useMemo(
+    () =>
+      perkFinderActive
+        ? rows.toSorted((a, b) => comparePerkFinderItems(perkResult)(a.item.id, b.item.id))
+        : rows,
+    [perkFinderActive, rows, perkResult],
+  );
+
+  /* End perk finder */
+
   const firstCompareItem = rows[0]?.item;
   // The example item is the one we'll use for generating suggestion buttons
   const exampleItem = initialItem || firstCompareItem;
@@ -208,7 +303,8 @@ export default function Compare({ session }: { session: CompareSession }) {
   const items = useMemo(
     () => (
       <CompareItems
-        rows={rows}
+        rows={orderedRows}
+        perkResult={perkFinderActive ? perkResult : undefined}
         tableCtx={tableCtx}
         filteredColumns={filteredColumns}
         remove={remove}
@@ -216,7 +312,7 @@ export default function Compare({ session }: { session: CompareSession }) {
         onPlugClicked={onPlugClicked}
       />
     ),
-    [rows, tableCtx, filteredColumns, remove, onPlugClicked],
+    [orderedRows, perkFinderActive, perkResult, tableCtx, filteredColumns, remove, onPlugClicked],
   );
 
   const selectOptions: Option<Settings['armorCompare']>[] = [
@@ -303,6 +399,16 @@ export default function Compare({ session }: { session: CompareSession }) {
           onChange={setAssumeWeaponMasterwork}
         />
       )}
+      {perkFinderAvailable && (
+        <button
+          type="button"
+          className={clsx('dim-button', { selected: showPerkFinder })}
+          aria-pressed={showPerkFinder}
+          onClick={() => setShowPerkFinder((show) => !show)}
+        >
+          {t('Compare.PerkFinder.Button')}
+        </button>
+      )}
       {exampleItem && <CompareSuggestions exampleItem={exampleItem} onQueryChanged={updateQuery} />}
       {organizerLink && (
         <Link className={styles.organizerLink} to={organizerLink}>
@@ -318,28 +424,47 @@ export default function Compare({ session }: { session: CompareSession }) {
     .join(' ')}`;
   return (
     <Sheet onClose={cancel} header={header} allowClickThrough>
-      <div className={styles.scroller}>
-        <div
-          className={styles.bucket}
-          style={{ gridTemplateRows: gridSpec }}
-          onPointerLeave={() => setHighlight(undefined)}
-        >
-          <CompareHeaders
-            columnSorts={columnSorts}
-            highlight={highlight}
-            setHighlight={setHighlight}
-            toggleColumnSort={toggleColumnSort}
-            filteredColumns={filteredColumns}
-          />
-          {items}
+      {showPerkFinder && perkFinderAvailable && (
+        <PerkFinder
+          columns={perkColumns}
+          priority={activePriority}
+          rankingEnabled={perkRankingEnabled}
+          onRankingEnabledChange={setPerkRankingEnabled}
+          onPriorityChange={setPerkPriority}
+          mode={perkMatchMode}
+          result={perkResult}
+          onTogglePerk={togglePerk}
+          onModeChange={setPerkMatchMode}
+          onClear={clearPerks}
+          junkCount={junkCandidates.length}
+          onTagJunk={tagOthersAsJunk}
+        />
+      )}
+      <HighlightedPerksContext value={highlightedPerks}>
+        <div className={styles.scroller}>
+          <div
+            className={styles.bucket}
+            style={{ gridTemplateRows: gridSpec }}
+            onPointerLeave={() => setHighlight(undefined)}
+          >
+            <CompareHeaders
+              columnSorts={columnSorts}
+              highlight={highlight}
+              setHighlight={setHighlight}
+              toggleColumnSort={toggleColumnSort}
+              filteredColumns={filteredColumns}
+            />
+            {items}
+          </div>
         </div>
-      </div>
+      </HighlightedPerksContext>
     </Sheet>
   );
 }
 
 function CompareItems({
   rows,
+  perkResult,
   tableCtx,
   filteredColumns,
   remove,
@@ -347,6 +472,7 @@ function CompareItems({
   onPlugClicked,
 }: {
   rows: Row[];
+  perkResult: PerkFinderResult | undefined;
   tableCtx: TableContext;
   filteredColumns: ColumnDefinition[];
   remove: (item: DimItem) => void;
@@ -364,8 +490,17 @@ function CompareItems({
       remove={remove}
       setHighlight={setHighlight}
       onPlugClicked={onPlugClicked}
+      perkFinderStatus={perkResult && getPerkFinderStatus(perkResult, row.item)}
     />
   ));
+}
+
+function getPerkFinderStatus(result: PerkFinderResult, item: DimItem): PerkFinderStatus {
+  return {
+    keep: result.keep.has(item.id),
+    matched: result.matchedCount.get(item.id) ?? 0,
+    total: result.pickedCount,
+  };
 }
 
 /**

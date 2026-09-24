@@ -91,3 +91,9 @@
     border-color: var(--theme-item-socket-border);
   }
 }
+
+// Picked in Compare's perk finder
+.highlighted {
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--theme-accent-primary);
+}

@@ -9,6 +9,9 @@ interface CssExports {
   'highlighted': string;
   'itemActions': string;
   'itemAside': string;
+  'keepBadge': string;
+  'noPerkMatches': string;
+  'perkFinderStatus': string;
   'separator': string;
   'sortAsc': string;
   'sortDesc': string;

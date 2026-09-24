@@ -1,0 +1,179 @@
+@use '../variables' as *;
+
+.perkFinder {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 8px 12px 16px;
+  border-bottom: 1px solid #f5f5f540;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--theme-text);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+
+  :global(.dim-button) {
+    // Undo the general mobile "big-buttons"
+    padding: 4px 10px;
+  }
+}
+
+.divider {
+  align-self: stretch;
+  width: 1px;
+  margin: 2px 4px;
+  background-color: #f5f5f540;
+}
+
+.sections {
+  // Sections share rows (helper text, then columns) so their column headers
+  // line up even when one section's helper text wraps to more lines
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: auto auto;
+  grid-auto-columns: max-content;
+  gap: 18px 24px;
+  overflow-x: auto;
+
+  @include phone-portrait {
+    grid-auto-flow: row;
+    grid-template-columns: 100%;
+  }
+}
+
+.section {
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  min-width: 0;
+
+  & + & {
+    padding-left: 24px;
+    border-left: 1px solid #f5f5f526;
+
+    @include phone-portrait {
+      padding-left: 0;
+      border-left: none;
+    }
+  }
+}
+
+.sectionHelp {
+  // Wrap to the width of the columns below, rather than widening the section
+  width: 0;
+  min-width: 100%;
+  font-size: 12px;
+  color: var(--theme-text-secondary);
+}
+
+.columns {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 160px;
+}
+
+.columnHeader {
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--theme-text-secondary);
+  padding: 0 4px 4px;
+}
+
+.perk {
+  --item-size: 24px;
+  composes: resetButton from '../dim-ui/common.m.scss';
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+
+  @include interactive($hover: true) {
+    background-color: #ffffff14;
+  }
+
+  &.selected {
+    border-color: var(--theme-accent-primary);
+    background-color: #ffffff1a;
+  }
+}
+
+.perkName {
+  flex: 1;
+}
+
+.count {
+  font-size: 11px;
+  color: var(--theme-text-secondary);
+  min-width: 1.5em;
+  text-align: right;
+}
+
+.modeHelp {
+  opacity: 0.6;
+  margin-left: 2px;
+}
+
+// The result: how many copies to keep
+.result {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  align-self: flex-start;
+  max-width: 720px;
+  padding: 10px 14px 10px 12px;
+  border: 1px solid var(--theme-accent-primary);
+  // A light tint of the border color
+  background-color: color-mix(in srgb, var(--theme-accent-primary) 12%, transparent);
+}
+
+.resultIcon {
+  // One line of the message tall, so the icon centers on its first line
+  display: flex;
+  align-items: center;
+  height: 20px;
+  color: var(--theme-accent-primary);
+}
+
+.resultText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.resultMessage {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--theme-text);
+}
+
+.resultNote {
+  font-size: 12px;
+  color: var(--theme-text-secondary);
+}

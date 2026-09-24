@@ -2,14 +2,17 @@ import { bungieNetPath } from 'app/dim-ui/BungieImage';
 import { DefItemIcon } from 'app/inventory/ItemIcon';
 import { isPluggableItem } from 'app/inventory/store/sockets';
 import { useD2Definitions } from 'app/manifest/selectors';
+import { normalizeToUnenhanced } from 'app/utils/perk-utils';
 import { isEnhancedPerk, isWeaponMasterworkSocket } from 'app/utils/socket-utils';
 import WishListPerkThumb from 'app/wishlists/WishListPerkThumb';
 import clsx from 'clsx';
+import { use } from 'react';
 import { PressTip } from '../dim-ui/PressTip';
 import { DimItem, DimPlug, DimSocket } from '../inventory/item-types';
 import { InventoryWishListRoll, isWishListPlug } from '../wishlists/wishlists';
 import * as styles from './Plug.m.scss';
 import { DimPlugTooltip } from './PlugTooltip';
+import { HighlightedPerksContext } from './highlighted-perks';
 
 interface PlugStatuses {
   plugged?: boolean;
@@ -45,6 +48,7 @@ export default function Plug({
   onClick?: (plug: DimPlug) => void;
 } & PlugStatuses) {
   const defs = useD2Definitions()!;
+  const highlightedPerks = use(HighlightedPerksContext);
 
   const modDef = defs.InventoryItem.get(plug.plugDef.hash);
   if (!modDef || !isPluggableItem(modDef)) {
@@ -63,6 +67,7 @@ export default function Plug({
         [styles.hasMenu]: hasMenu,
         [styles.mod]: isMod,
         [styles.masterwork]: item.masterwork && isWeaponMasterworkSocket(socketInfo),
+        [styles.highlighted]: highlightedPerks.has(normalizeToUnenhanced(plug.plugDef.hash)),
       })}
       role={doClick ? 'button' : undefined}
       onClick={doClick}

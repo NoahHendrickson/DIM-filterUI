@@ -30,6 +30,16 @@ import {
 } from '../shell/icons';
 import * as styles from './CompareItem.m.scss';
 
+/** How an item fares against the perks picked in the perk finder */
+export interface PerkFinderStatus {
+  /** This item is one of the fewest items needed to get every pick */
+  keep: boolean;
+  /** How many of the picked perks this item has */
+  matched: number;
+  /** How many perks were picked */
+  total: number;
+}
+
 export default memo(function CompareItem({
   item,
   row,
@@ -38,6 +48,7 @@ export default memo(function CompareItem({
   itemClick,
   remove,
   setHighlight,
+  perkFinderStatus,
 }: {
   item: DimItem;
   row: Row;
@@ -47,6 +58,7 @@ export default memo(function CompareItem({
   remove: (item: DimItem) => void;
   setHighlight: (value?: string | number) => void;
   onPlugClicked: (value: { item: DimItem; socket: DimSocket; plugHash: number }) => void;
+  perkFinderStatus?: PerkFinderStatus;
 }) {
   const headerRef = useRef<HTMLDivElement>(null);
   useSetCSSVarToHeight(headerRef, '--compare-item-height');
@@ -59,9 +71,14 @@ export default memo(function CompareItem({
   const { pathname } = useLocation();
   const isFindable = !item.vendor && pathname.endsWith('/inventory');
 
+  const noPerkMatches = perkFinderStatus?.matched === 0;
+
   const itemHeader = useMemo(
     () => (
-      <div ref={headerRef} className={styles.headerContainer}>
+      <div
+        ref={headerRef}
+        className={clsx(styles.headerContainer, { [styles.noPerkMatches]: noPerkMatches })}
+      >
         <div className={styles.itemActions}>
           {item.vendor ? (
             <VendorItemWarning item={item} />
@@ -80,6 +97,19 @@ export default memo(function CompareItem({
           {item.taggable ? <TagActionButton item={item} label={false} hideKeys={true} /> : <div />}
           <button type="button" className={styles.close} onClick={() => remove(item)} />
         </div>
+        {perkFinderStatus && (
+          <div className={styles.perkFinderStatus}>
+            {perkFinderStatus.keep && (
+              <span className={styles.keepBadge}>{t('Compare.PerkFinder.Keep')}</span>
+            )}
+            <span>
+              {t('Compare.PerkFinder.Matched', {
+                matched: perkFinderStatus.matched,
+                total: perkFinderStatus.total,
+              })}
+            </span>
+          </div>
+        )}
         <ItemPopupTrigger item={item} noCompare={true}>
           {(ref, onClick) => (
             <div className={styles.itemAside} ref={ref} onClick={onClick}>
@@ -89,7 +119,7 @@ export default memo(function CompareItem({
         </ItemPopupTrigger>
       </div>
     ),
-    [item, pullItem, remove],
+    [item, pullItem, remove, perkFinderStatus, noPerkMatches],
   );
 
   const handleRowClick = (row: Row, column: ColumnDefinition) => {
@@ -109,6 +139,7 @@ export default memo(function CompareItem({
           onClick={handleRowClick(row, column)}
           className={clsx(
             column.className,
+            { [styles.noPerkMatches]: noPerkMatches },
             column.id === 'name' && {
               'compare-findable': isFindable,
             },
